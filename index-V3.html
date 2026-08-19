@@ -106,7 +106,7 @@
                 statusText.innerText = "⚠️ Erreur accès caméra vidéo";
             }
         }
-        demarrerCameraVideo();
+        //demarrerCameraVideo();
 
         // Écoute des capteurs matériels
         window.addEventListener('devicemotion', (e) => {
@@ -141,29 +141,35 @@
 
         // Machine à états pour le bouton REC principal
         btnRec.addEventListener('click', async () => {
-            // Demande d'autorisation iOS au premier clic
-            if (etatCourant === "STOPPED" && typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-                try {
-                    const permission = await DeviceMotionEvent.requestPermission();
-                    if (permission !== 'granted') { alert("Accès capteurs refusé."); return; }
-                } catch (e) { console.error(e); }
+            
+            // Force le démarrage de la caméra au premier clic
+            if (!video.srcObject) {
+                await demarrerCameraVideo();
             }
 
+            // Sécurité pour éviter le plantage d'Android sur la fonction iOS
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                if (etatCourant === "STOPPED") {
+                    try {
+                        const permission = await DeviceMotionEvent.requestPermission();
+                        if (permission !== 'granted') { alert("Accès capteurs refusé."); return; }
+                    } catch (e) { console.error(e); }
+                }
+            }
+
+            // Gestion de l'enregistrement (REC / PAUSE)
             if (etatCourant === "STOPPED" || etatCourant === "PAUSED") {
-                // PASSAGE EN MODE ENREGISTREMENT
                 if (resetActif && etatCourant === "STOPPED") {
-                    indexPoint = 1; // Si le bouton reset est actif, on repart bien de 1
+                    indexPoint = 1; 
                 }
                 etatCourant = "RECORDING";
                 
-                // Changement visuel : REC devient vert fluo
                 labelRec.style.display = "block";
                 iconPause.style.display = "none";
                 labelRec.className = "txt-vert-fluo";
                 btnRecInner.className = "btn-rec-inner"; 
                 statusText.innerText = "🔴 Enregistrement en continu...";
 
-                // Lancement de la boucle temporelle 30Hz
                 intervalId = setInterval(() => {
                     const payload = { index: indexPoint, ...mesuresCourantes };
                     envoyerDonnees(payload);
@@ -172,14 +178,11 @@
                 }, 33.3);
 
             } else if (etatCourant === "RECORDING") {
-                // PASSAGE EN MODE PAUSE
                 etatCourant = "PAUSED";
-                clearInterval(intervalId); // On fige l'envoi de données
+                clearInterval(intervalId); 
 
-                // Si après pause le bouton reset est tjs actif, on prévoit de repartir du début au prochain REC
                 if (resetActif) { indexPoint = 1; }
 
-                // Changement visuel : Icône pause orange clignotant
                 labelRec.style.display = "none";
                 iconPause.style.display = "flex";
                 btnRecInner.className = "btn-rec-inner clignote-orange";
