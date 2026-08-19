@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Moniteur Virtual Cam - 30Hz</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; margin: 0; padding: 0; background: #000; overflow: hidden; color: white; }
+        
+        /* Vidéo de la caméra en plein écran arrière-plan */
+        #video-preview { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1; }
+        
+        /* Interface par-dessus la vidéo */
+        .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; pointer-events: none; }
+        
+        .top-info { background: rgba(0,0,0,0.6); padding: 15px; border-radius: 12px; backdrop-filter: blur(5px); text-align: left; }
+        h1 { margin: 0 0 5px 0; font-size: 1.2rem; color: #007bff; }
+        
+        .btn-container { pointer-events: auto; width: 100%; }
+        .btn { border: none; padding: 18px; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; width: 100%; color: white; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        #btn-start { background: #28a745; }
+        #btn-stop { background: #dc3545; display: none; }
+        
+        .status { font-weight: bold; color: #aaa; font-size: 0.9rem; margin-top: 5px; }
+        .recording { color: #dc3545; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.4; } }
+    </style>
+</head>
+<body>
+
+    <!-- Flux vidéo de la caméra -->
+    <video id="video-preview" autoplay playsinline muted></video>
+
+    <!-- Interface utilisateur -->
+    <div class="ui-layer">
+        <div class="top-info">
+            <h1>Moniteur Pro (30 Hz)</h1>
+            <div id="status-text" class="status">Caméra et capteurs prêts</div>
+            <p id="live-data" style="margin: 10px 0 0 0; font-family: monospace; font-size: 0.85rem; line-height: 1.4;">
+                X: 0.00 | Y: 0.00 | Z: 0.00<br>A: 0° | B: 0° | G: 0°
+            </p>
+        </div>
+
+        <div class="btn-container">
+            <button id="btn-start" class="btn">DÉMARRER LA CAPTURE</button>
+            <button id="btn-stop" class="btn">STOP / ENREGISTRER</button>
+        </div>
+    </div>
+
+    <script>
+        // ⚠️ REMETTEZ VOTRE URL GOOGLE APPS SCRIPT ICI :
+        const URL_GOOGLE_SCRIPT = "VOTRE_URL_GOOGLE_APPS_SCRIPT_ICI";
+
+        let enregistrementActif = false;
+        let intervalId = null;
+        let mesuresCourantes = { x: 0, y: 0, z: 0, alpha: 0, beta: 0, gamma: 0 };
+
+        const video = document.getElementById('video-preview');
+        const btnStart = document.getElementById('btn-start');
+        const btnStop = document.getElementById('btn-stop');
+        const statusText = document.getElementById('status-text');
+        const liveDataDisplay = document.getElementById('live-data');
+
+        // Activer la caméra vidéo réelle dès le chargement de la page
+        async function demarrerCameraVideo() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: "environment" } }, // Force l'utilisation de la caméra arrière
+                    audio: false
+                });
+                video.srcObject = stream;
+            } catch (err) {
+                console.error("Impossible d'accéder à la caméra vidéo :", err);
+                statusText.innerText = "⚠️ Erreur vidéo (Vérifiez les permissions)";
+            }
+        }
+        demarrerCameraVideo();
+
+        // Gestion du bouton Démarrer (Capteurs + Boucle Haute Fréquence)
+        btnStart.addEventListener('click', async () => {
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                try {
+                    const permission = await DeviceMotionEvent.requestPermission();
+                    if (permission === 'granted') initialiserCaptureHauteFrequence();
+                    else alert("Accès capteurs refusé.");
+                } catch (e) { console.error(e); }
+            } else {
+                initialiserCaptureHauteFrequence();
+            }
+        });
+
+        btnStop.addEventListener('click', () => {
+            enregistrementActif = false;
+            clearInterval(intervalId);
+            btnStop.style.display = 'none';
+            btnStart.style.display = 'block';
+            statusText.className = "status";
+            statusText.innerText = "Données envoyées sur le Drive !";
+        });
+
+        function initialiserCaptureHauteFrequence() {
+            enregistrementActif = true;
+            btnStart.style.display = 'none';
+            btnStop.style.display = 'block';
+            statusText.className = "status recording";
+            statusText.innerText = "🔴 ENREGISTREMENT EN COURS (30 Hz)...";
+
+            window.addEventListener('devicemotion', (event) => {
+                const acc = event.accelerationIncludingGravity;
+                if (acc) {
+                    mesuresCourantes.x = acc.x || 0;
+                    mesuresCourantes.y = acc.y || 0;
+                    mesuresCourantes.z = acc.z || 0;
+                    rafraichirVisuel();
+                }
+            });
+
+            window.addEventListener('deviceorientation', (event) => {
+                mesuresCourantes.alpha = event.alpha || 0;
+                mesuresCourantes.beta = event.beta || 0;
+                mesuresCourantes.gamma = event.gamma || 0;
+                rafraichirVisuel();
+            });
+
+            // ⏱️ CADENCE CINÉMA (30 Hz) : Envoi toutes les 33.3 millisecondes
+            intervalId = setInterval(() => {
+                if (enregistrementActif) {
+                    envoyerDonneesVersGoogleDrive({ ...mesuresCourantes });
+                }
+            }, 33.3);
+        }
+
+        function rafraichirVisuel() {
+            liveDataDisplay.innerHTML = `
+                <strong>ACCEL</strong> X: ${mesuresCourantes.x.toFixed(2)} | Y: ${mesuresCourantes.y.toFixed(2)} | Z: ${mesuresCourantes.z.toFixed(2)}<br>
+                <strong>ROTATION</strong> A: ${mesuresCourantes.alpha.toFixed(0)}° | B: ${mesuresCourantes.beta.toFixed(0)}° | G: ${mesuresCourantes.gamma.toFixed(0)}°
+            `;
+        }
+
+        function envoyerDonneesVersGoogleDrive(donnees) {
+            if (URL_GOOGLE_SCRIPT.includes("VOTRE_URL_GOOGLE_APPS_SCRIPT")) return;
+            fetch(URL_GOOGLE_SCRIPT, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(donnees)
+            }).catch(err => console.error(err));
+        }
+    </script>
+</body>
+</html>
