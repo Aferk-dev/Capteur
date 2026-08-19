@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enregistreur de Capteurs Live</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f4f6f9; color: #333; text-align: center; }
+        .card { background: white; padding: 15px; margin: 15px auto; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); max-width: 400px; text-align: left; }
+        h2 { margin-top: 0; color: #007bff; font-size: 1.1rem; }
+        .btn { border: none; padding: 15px 30px; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; width: 100%; max-width: 400px; margin: 10px 0; color: white; transition: 0.2s; }
+        #btn-start { background: #28a745; }
+        #btn-start:hover { background: #218838; }
+        #btn-stop { background: #dc3545; display: none; }
+        #btn-stop:hover { background: #c82333; }
+        .status { font-weight: bold; color: #6c757d; margin: 15px 0; }
+        .recording { color: #dc3545; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+
+    <h1>Enregistreur Temporel</h1>
+    <div id="status-text" class="status">Prêt à démarrer</div>
+
+    <button id="btn-start" class="btn">DÉMARRER L'ENREGISTREMENT</button>
+    <button id="btn-stop" class="btn">FIN / ARRÊTER</button>
+
+    <div class="card">
+        <h2>Dernières valeurs lues :</h2>
+        <p id="live-data">X: 0.00 | Y: 0.00 | Z: 0.00<br>Alpha: 0° | Beta: 0° | Gamma: 0°<br>GPS: En attente...</p>
+    </div>
+
+    <script>
+        // ⚠️ ENLEVEZ LES COMPTES ET METTEZ VOTRE LIEN ICI :
+        const URL_GOOGLE_SCRIPT = "VOTRE_URL_GOOGLE_APPS_SCRIPT_ICI";
+
+        let enregistrementActif = false;
+        let intervalId = null;
+
+        // Variables temporaires pour stocker la dernière valeur lue par les capteurs
+        let mesuresCourantes = { x: 0, y: 0, z: 0, alpha: 0, beta: 0, gamma: 0, lat: null, lng: null };
+
+        const btnStart = document.getElementById('btn-start');
+        const btnStop = document.getElementById('btn-stop');
+        const statusText = document.getElementById('status-text');
+        const liveDataDisplay = document.getElementById('live-data');
+
+        // Demande des accès et démarrage
+        btnStart.addEventListener('click', async () => {
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                try {
+                    const permission = await DeviceMotionEvent.requestPermission();
+                    if (permission === 'granted') initialiserCapteurs();
+                    else alert("Accès refusé aux capteurs.");
+                } catch (e) { console.error(e); }
+            } else {
+                initialiserCapteurs();
+            }
+        });
+
+        // Arrêt de la session
+        btnStop.addEventListener('click', () => {
+            enregistrementActif = false;
+            clearInterval(intervalId);
+            
+            btnStop.style.display = 'none';
+            btnStart.style.display = 'inline-block';
+            statusText.className = "status";
+            statusText.innerText = "Enregistrement terminé et envoyé !";
+        });
+
+        function initialiserCapteurs() {
+            enregistrementActif = true;
+            btnStart.style.display = 'none';
+            btnStop.style.display = 'inline-block';
+            statusText.className = "status recording";
+            statusText.innerText = "🔴 Enregistrement en cours (1pt / sec)...";
+
+            // 1. Écoute continue de l'accéléromètre
+            window.addEventListener('devicemotion', (event) => {
+                const acc = event.accelerationIncludingGravity;
+                if (acc) {
+                    mesuresCourantes.x = acc.x || 0;
+                    mesuresCourantes.y = acc.y || 0;
+                    mesuresCourantes.z = acc.z || 0;
+                    rafraichirAffichageVisuel();
+                }
+            });
+
+            // 2. Écoute continue de l'orientation
+            window.addEventListener('deviceorientation', (event) => {
+                mesuresCourantes.alpha = event.alpha || 0;
+                mesuresCourantes.beta = event.beta || 0;
+                mesuresCourantes.gamma = event.gamma || 0;
+                rafraichirAffichageVisuel();
+            });
+
+            // 3. Écoute continue du GPS
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition((position) => {
+                    mesuresCourantes.lat = position.coords.latitude;
+                    mesuresCourantes.lng = position.coords.longitude;
+                    rafraichirAffichageVisuel();
+                }, null, { enableHighAccuracy: true });
+            }
+
+            // ⏱️ BOUCLE DE TEMPS : Envoi au Google Sheets toutes les 1000ms (1 seconde)
+            intervalId = setInterval(() => {
+                if (enregistrementActif) {
+                    envoyerDonneesVersGoogleDrive({ ...mesuresCourantes });
+                }
+            }, 1000);
+        }
+
+        function rafraichirAffichageVisuel() {
+            liveDataDisplay.innerHTML = `
+                <strong>Accél. (m/s²) :</strong> X: ${mesuresCourantes.x.toFixed(2)} | Y: ${mesuresCourantes.y.toFixed(2)} | Z: ${mesuresCourantes.z.toFixed(2)}<br>
+                <strong>Orient. (°) :</strong> A: ${mesuresCourantes.alpha.toFixed(0)}° | B: ${mesuresCourantes.beta.toFixed(0)}° | G: ${mesuresCourantes.gamma.toFixed(0)}°<br>
+                <strong>GPS :</strong> ${mesuresCourantes.lat ? mesuresCourantes.lat.toFixed(5) + ', ' + mesuresCourantes.lng.toFixed(5) : 'Recherche...'}
+            `;
+        }
+
+        function envoyerDonneesVersGoogleDrive(donnees) {
+            if (URL_GOOGLE_SCRIPT.includes("VOTRE_URL_GOOGLE_APPS_SCRIPT")) {
+                console.warn("L'URL Google Apps Script n'a pas été configurée.");
+                return;
+            }
+
+            fetch(URL_GOOGLE_SCRIPT, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(donnees)
+            }).catch(err => console.error("Erreur d'envoi :", err));
+        }
+    </script>
+</body>
+</html>
