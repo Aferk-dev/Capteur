@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Moniteur Virtual Cam - 30Hz Multi-États</title>
+    <title>Moniteur Virtual Cam Pro - 30Hz</title>
     <style>
         * { box-sizing: border-box; }
         body { font-family: -apple-system, sans-serif; margin: 0; padding: 0; background: #000; overflow: hidden; color: white; }
@@ -15,28 +15,20 @@
         .top-info { background: rgba(0,0,0,0.6); padding: 15px; border-radius: 12px; backdrop-filter: blur(5px); text-align: left; }
         h1 { margin: 0 0 5px 0; font-size: 1.2rem; color: #007bff; }
         
-        /* Barre de commandes en bas */
         .controls-container { pointer-events: auto; width: 100%; display: flex; align-items: center; justify-content: space-around; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 16px; backdrop-filter: blur(5px); }
         
-        /* Style du Bouton Circulaire REC/PAUSE */
         .btn-rec-container { position: relative; width: 80px; height: 80px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
         .btn-rec-inner { width: 70px; height: 70px; border-radius: 50%; background: #ff0000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; transition: 0.2s; }
         
-        /* États du texte REC */
         .txt-blanc { color: #ffffff; }
         .txt-vert-fluo { color: #39ff14; text-shadow: 0 0 8px #39ff14; }
         
-        /* Symbole Pause Moderne (Deux barres) */
         .pause-icon { display: none; width: 22px; height: 26px; justify-content: space-between; }
         .pause-bar { width: 8px; height: 100%; background: #ffa500; border-radius: 2px; }
         
-        /* Animations Clignotantes */
-        .clignote-fluo { animation: blinkFluo 1s infinite; }
         .clignote-orange .pause-bar { animation: blinkOrange 1s infinite; }
-        @keyframes blinkFluo { 50% { opacity: 0.4; } }
         @keyframes blinkOrange { 50% { background: #ff4500; box-shadow: 0 0 10px #ff4500; } }
 
-        /* Style du Bouton Reset de l'index (Vert) */
         .btn-reset { width: 50px; height: 50px; border-radius: 50%; background: #222; border: 3px solid #666; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; }
         .btn-reset svg { width: 24px; height: 24px; fill: #666; transition: 0.2s; }
         .btn-reset.actif { border-color: #39ff14; box-shadow: 0 0 10px #39ff14; }
@@ -52,17 +44,15 @@
             <h1>Moniteur Pro Réparti (30 Hz)</h1>
             <div id="status-text" style="font-weight: bold; color: #aaa;">Statut : Prêt à l'enregistrement</div>
             <p id="live-data" style="margin: 8px 0 0 0; font-family: monospace; font-size: 0.85rem; color: #00ffcc;">
-                Index local : 1 | X: 0.00 | Y: 0.00 | Z: 0.00
+                INDEX TRANSMIS : 1 <br> ACCEL : X: 0.0 | Y: 0.0 | Z: 0.0
             </p>
         </div>
 
         <div class="controls-container">
-            <!-- Bouton Reset Répartir du début (Vert) -->
             <div id="btn-reset" class="btn-reset actif" title="Réinitialiser l'index au début">
                 <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
             </div>
 
-            <!-- Bouton Multi-États REC / PAUSE -->
             <div id="btn-rec" class="btn-rec-container">
                 <div id="btn-rec-inner" class="btn-rec-inner">
                     <span id="label-rec" class="txt-blanc">REC</span>
@@ -76,13 +66,13 @@
     </div>
 
     <script>
-        const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbw-lcalrUOemS1w3DgSnKKHNHrMHnn6QV-dyQs1Eix_Ih1gRSoLs4vzd8yY7usnGS7s/exec";
+        // Ligne 73 : Votre URL cible Google Script intermédiaire
+        const URL_GOOGLE_SCRIPT = "https://google.com";
 
-        let etatCourant = "STOPPED"; // Configuration : STOPPED, RECORDING, PAUSED
+        let etatCourant = "STOPPED"; 
         let intervalId = null;
         let indexPoint = 1;
-        let resetActif = true; // Par défaut actif au démarrage (couleur fluo)
-        
+        let resetActif = true; 
         let mesuresCourantes = { x: 0, y: 0, z: 0, alpha: 0, beta: 0, gamma: 0 };
 
         const video = document.getElementById('video-preview');
@@ -94,7 +84,6 @@
         const statusText = document.getElementById('status-text');
         const liveDataDisplay = document.getElementById('live-data');
 
-        // Initialisation vidéo
         async function demarrerCameraVideo() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -103,12 +92,10 @@
                 });
                 video.srcObject = stream;
             } catch (err) {
-                statusText.innerText = "⚠️ Erreur accès caméra vidéo";
+                statusText.innerText = "⚠️ Erreur caméra : " + err.message;
             }
         }
-        //demarrerCameraVideo();
 
-        // Écoute des capteurs matériels
         window.addEventListener('devicemotion', (e) => {
             const acc = e.accelerationIncludingGravity;
             if (acc) {
@@ -118,6 +105,7 @@
                 rafraichirVisuel();
             }
         });
+
         window.addEventListener('deviceorientation', (e) => {
             mesuresCourantes.alpha = e.alpha || 0;
             mesuresCourantes.beta = e.beta || 0;
@@ -125,43 +113,36 @@
             rafraichirVisuel();
         });
 
-        // Gestion du bouton de réinitialisation d'index (Reset Vert)
         btnReset.addEventListener('click', () => {
             resetActif = !resetActif;
             if (resetActif) {
                 btnReset.classList.add('actif');
-                if (etatCourant === "PAUSED" || etatCourant === "STOPPED") {
-                    indexPoint = 1; // Forcer le retour au début
-                }
+                if (etatCourant === "PAUSED" || etatCourant === "STOPPED") { indexPoint = 1; }
             } else {
                 btnReset.classList.remove('actif');
             }
             rafraichirVisuel();
         });
 
-        // Machine à états pour le bouton REC principal
         btnRec.addEventListener('click', async () => {
-            
-            // Force le démarrage de la caméra au premier clic
+            // Déclenchement de la caméra au premier clic utilisateur
             if (!video.srcObject) {
                 await demarrerCameraVideo();
             }
 
-            // Sécurité pour éviter le plantage d'Android sur la fonction iOS
+            // Gestion de la sécurité des capteurs iOS/Android
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 if (etatCourant === "STOPPED") {
                     try {
                         const permission = await DeviceMotionEvent.requestPermission();
-                        if (permission !== 'granted') { alert("Accès capteurs refusé."); return; }
+                        if (permission !== 'granted') { statusText.innerText = "⚠️ Capteurs refusés"; return; }
                     } catch (e) { console.error(e); }
                 }
             }
 
-            // Gestion de l'enregistrement (REC / PAUSE)
+            // Logique de la machine à états (REC / PAUSE)
             if (etatCourant === "STOPPED" || etatCourant === "PAUSED") {
-                if (resetActif && etatCourant === "STOPPED") {
-                    indexPoint = 1; 
-                }
+                if (resetActif && etatCourant === "STOPPED") { indexPoint = 1; }
                 etatCourant = "RECORDING";
                 
                 labelRec.style.display = "block";
@@ -201,3 +182,10 @@
             fetch(URL_GOOGLE_SCRIPT, {
                 method: "POST",
                 mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(donnees)
+            }).catch(err => console.error(err));
+        }
+    </script>
+</body>
+</html>
