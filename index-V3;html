@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Moniteur Virtual Cam - 30Hz Multi-États</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; margin: 0; padding: 0; background: #000; overflow: hidden; color: white; }
+        
+        #video-preview { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1; }
+        
+        .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; pointer-events: none; }
+        
+        .top-info { background: rgba(0,0,0,0.6); padding: 15px; border-radius: 12px; backdrop-filter: blur(5px); text-align: left; }
+        h1 { margin: 0 0 5px 0; font-size: 1.2rem; color: #007bff; }
+        
+        /* Barre de commandes en bas */
+        .controls-container { pointer-events: auto; width: 100%; display: flex; align-items: center; justify-content: space-around; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 16px; backdrop-filter: blur(5px); }
+        
+        /* Style du Bouton Circulaire REC/PAUSE */
+        .btn-rec-container { position: relative; width: 80px; height: 80px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .btn-rec-inner { width: 70px; height: 70px; border-radius: 50%; background: #ff0000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; transition: 0.2s; }
+        
+        /* États du texte REC */
+        .txt-blanc { color: #ffffff; }
+        .txt-vert-fluo { color: #39ff14; text-shadow: 0 0 8px #39ff14; }
+        
+        /* Symbole Pause Moderne (Deux barres) */
+        .pause-icon { display: none; width: 22px; height: 26px; justify-content: space-between; }
+        .pause-bar { width: 8px; height: 100%; background: #ffa500; border-radius: 2px; }
+        
+        /* Animations Clignotantes */
+        .clignote-fluo { animation: blinkFluo 1s infinite; }
+        .clignote-orange .pause-bar { animation: blinkOrange 1s infinite; }
+        @keyframes blinkFluo { 50% { opacity: 0.4; } }
+        @keyframes blinkOrange { 50% { background: #ff4500; box-shadow: 0 0 10px #ff4500; } }
+
+        /* Style du Bouton Reset de l'index (Vert) */
+        .btn-reset { width: 50px; height: 50px; border-radius: 50%; background: #222; border: 3px solid #666; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; }
+        .btn-reset svg { width: 24px; height: 24px; fill: #666; transition: 0.2s; }
+        .btn-reset.actif { border-color: #39ff14; box-shadow: 0 0 10px #39ff14; }
+        .btn-reset.actif svg { fill: #39ff14; }
+    </style>
+</head>
+<body>
+
+    <video id="video-preview" autoplay playsinline muted></video>
+
+    <div class="ui-layer">
+        <div class="top-info">
+            <h1>Moniteur Pro Réparti (30 Hz)</h1>
+            <div id="status-text" style="font-weight: bold; color: #aaa;">Statut : Prêt à l'enregistrement</div>
+            <p id="live-data" style="margin: 8px 0 0 0; font-family: monospace; font-size: 0.85rem; color: #00ffcc;">
+                Index local : 1 | X: 0.00 | Y: 0.00 | Z: 0.00
+            </p>
+        </div>
+
+        <div class="controls-container">
+            <!-- Bouton Reset Répartir du début (Vert) -->
+            <div id="btn-reset" class="btn-reset actif" title="Réinitialiser l'index au début">
+                <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            </div>
+
+            <!-- Bouton Multi-États REC / PAUSE -->
+            <div id="btn-rec" class="btn-rec-container">
+                <div id="btn-rec-inner" class="btn-rec-inner">
+                    <span id="label-rec" class="txt-blanc">REC</span>
+                    <div id="icon-pause" class="pause-icon">
+                        <div class="pause-bar"></div>
+                        <div class="pause-bar"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const URL_GOOGLE_SCRIPT = "https://google.com";
+
+        let etatCourant = "STOPPED"; // Configuration : STOPPED, RECORDING, PAUSED
+        let intervalId = null;
+        let indexPoint = 1;
+        let resetActif = true; // Par défaut actif au démarrage (couleur fluo)
+        
+        let mesuresCourantes = { x: 0, y: 0, z: 0, alpha: 0, beta: 0, gamma: 0 };
+
+        const video = document.getElementById('video-preview');
+        const btnRec = document.getElementById('btn-rec');
+        const btnRecInner = document.getElementById('btn-rec-inner');
+        const labelRec = document.getElementById('label-rec');
+        const iconPause = document.getElementById('icon-pause');
+        const btnReset = document.getElementById('btn-reset');
+        const statusText = document.getElementById('status-text');
+        const liveDataDisplay = document.getElementById('live-data');
+
+        // Initialisation vidéo
+        async function demarrerCameraVideo() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: "environment" } },
+                    audio: false
+                });
+                video.srcObject = stream;
+            } catch (err) {
+                statusText.innerText = "⚠️ Erreur accès caméra vidéo";
+            }
+        }
+        demarrerCameraVideo();
+
+        // Écoute des capteurs matériels
+        window.addEventListener('devicemotion', (e) => {
+            const acc = e.accelerationIncludingGravity;
+            if (acc) {
+                mesuresCourantes.x = acc.x || 0;
+                mesuresCourantes.y = acc.y || 0;
+                mesuresCourantes.z = acc.z || 0;
+                rafraichirVisuel();
+            }
+        });
+        window.addEventListener('deviceorientation', (e) => {
+            mesuresCourantes.alpha = e.alpha || 0;
+            mesuresCourantes.beta = e.beta || 0;
+            mesuresCourantes.gamma = e.gamma || 0;
+            rafraichirVisuel();
+        });
+
+        // Gestion du bouton de réinitialisation d'index (Reset Vert)
+        btnReset.addEventListener('click', () => {
+            resetActif = !resetActif;
+            if (resetActif) {
+                btnReset.classList.add('actif');
+                if (etatCourant === "PAUSED" || etatCourant === "STOPPED") {
+                    indexPoint = 1; // Forcer le retour au début
+                }
+            } else {
+                btnReset.classList.remove('actif');
+            }
+            rafraichirVisuel();
+        });
+
+        // Machine à états pour le bouton REC principal
+        btnRec.addEventListener('click', async () => {
+            // Demande d'autorisation iOS au premier clic
+            if (etatCourant === "STOPPED" && typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                try {
+                    const permission = await DeviceMotionEvent.requestPermission();
+                    if (permission !== 'granted') { alert("Accès capteurs refusé."); return; }
+                } catch (e) { console.error(e); }
+            }
+
+            if (etatCourant === "STOPPED" || etatCourant === "PAUSED") {
+                // PASSAGE EN MODE ENREGISTREMENT
+                if (resetActif && etatCourant === "STOPPED") {
+                    indexPoint = 1; // Si le bouton reset est actif, on repart bien de 1
+                }
+                etatCourant = "RECORDING";
+                
+                // Changement visuel : REC devient vert fluo
+                labelRec.style.display = "block";
+                iconPause.style.display = "none";
+                labelRec.className = "txt-vert-fluo";
+                btnRecInner.className = "btn-rec-inner"; 
+                statusText.innerText = "🔴 Enregistrement en continu...";
+
+                // Lancement de la boucle temporelle 30Hz
+                intervalId = setInterval(() => {
+                    const payload = { index: indexPoint, ...mesuresCourantes };
+                    envoyerDonnees(payload);
+                    indexPoint++;
+                    rafraichirVisuel();
+                }, 33.3);
+
+            } else if (etatCourant === "RECORDING") {
+                // PASSAGE EN MODE PAUSE
+                etatCourant = "PAUSED";
+                clearInterval(intervalId); // On fige l'envoi de données
+
+                // Si après pause le bouton reset est tjs actif, on prévoit de repartir du début au prochain REC
+                if (resetActif) { indexPoint = 1; }
+
+                // Changement visuel : Icône pause orange clignotant
+                labelRec.style.display = "none";
+                iconPause.style.display = "flex";
+                btnRecInner.className = "btn-rec-inner clignote-orange";
+                statusText.innerText = "⏸️ Enregistrement suspendu (Pause)";
+            }
+        });
+
+        function rafraichirVisuel() {
+            liveDataDisplay.innerHTML = `
+                <strong>INDEX TRANSMIS :</strong> ${indexPoint} <br>
+                <strong>ACCEL :</strong> X: ${mesuresCourantes.x.toFixed(1)} | Y: ${mesuresCourantes.y.toFixed(1)} | Z: ${mesuresCourantes.z.toFixed(1)}
+            `;
+        }
+
+        function envoyerDonnees(donnees) {
+            fetch(URL_GOOGLE_SCRIPT, {
+                method: "POST",
+                mode: "no-cors",
