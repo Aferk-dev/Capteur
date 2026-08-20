@@ -68,7 +68,7 @@
 <script>
 	// Bloc n°3
     const VERSION_APP = "V7.4";
-    const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbys-AcdAc1UtQx-yvLXusq7MXWSAtv7f2L20Hy6p2dqATbUYxr7DP3bmKBBRWdqBxBa/exec";
+    const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbzZ9auABiFHZ6cbxhVg7YdmfUGQ5bdaGcr8uEdSmZxGgNmuK-ORBZly7YfVaUiHgsM/exec";
     let etatCourant = "STOPPED", intervalId = null, resetActif = false; 
     let indexPoint = 1; 
     let curX = 0, curY = 0, curZ = 0, curA = 0, curB = 0, curG = 0, blocDonneesSession = [];
@@ -128,6 +128,13 @@
                 blocDonneesSession = []; 
                 resetActif = false; 
                 btnReset.classList.remove('actif');
+                
+                // 🌟 ENVOI DE L'ORDRE DE PURGE IMMÉDIAT À GOOGLE
+                statusText.innerText = "Status : Purge du tableur...";
+                let formDataReset = new FormData();
+                formDataReset.append("action", "RESET");
+                fetch(URL_GOOGLE_SCRIPT, { method: "POST", body: formDataReset })
+                    .then(() => { statusText.innerText = "Status : Tableur vidé ✓"; });
             } else {
                 let memoireIndex = localStorage.getItem("dernier_index_virtuel");
                 indexPoint = memoireIndex ? parseInt(memoireIndex) : 1;
