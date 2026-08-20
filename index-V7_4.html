@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Moniteur Virtual Cam Pro - V7.4</title>
+    <style>
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; background: #5b9bd5; font-family: -apple-system, sans-serif; height: 100%; min-height: -webkit-fill-available; color: white; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        
+        /* Conteneur principal utilisant la hauteur disponible réelle du navigateur */
+        .main-container { display: flex; flex-direction: column; width: 100%; max-width: 450px; height: 100vh; height: -webkit-fill-available; padding: 12px; gap: 10px; justify-content: space-between; }
+        
+        .video-zone { flex: 1.2; background: #000; border-radius: 25px; border: 3px solid #1f4e79; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        #video-preview { width: 100%; height: 100%; object-fit: cover; }
+        
+        .data-box { flex: 0.7; background: #000; border: 2px solid #aaa; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; line-height: 1.4; display: flex; flex-direction: column; justify-content: center; }
+        .data-box-title { border-bottom: 1px solid #555; padding-bottom: 4px; margin-bottom: 4px; font-weight: bold; color: #ddd; }
+        .buttons-zone { display: flex; justify-content: space-around; align-items: center; width: 100%; padding-bottom: 5px; gap: 10px; }
+        .round-btn { position: relative; width: 60px; height: 60px; border-radius: 50%; border: 3px solid white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); transition: transform 0.1s; color: white; }
+        .round-btn:active { transform: scale(0.92); }
+        #btn-reset { background: linear-gradient(135deg, #11998e, #38ef7d); }
+        #btn-reset.actif { background: #39ff14; box-shadow: 0 0 15px #39ff14; }
+        #btn-reset svg { width: 24px; height: 24px; fill: white; }
+        #btn-rec { background: #ff0000; }
+        .txt-vert-fluo { color: #39ff14; text-shadow: 0 0 8px #39ff14; }
+        .pause-icon { display: none; width: 18px; height: 22px; justify-content: space-between; }
+        .pause-bar { width: 6px; height: 100%; background: #ffa500; border-radius: 2px; }
+        .clignote-orange .pause-bar { animation: blinkOrange 1s infinite; }
+        @keyframes blinkOrange { 50% { background: #ff4500; } }
+        #btn-stop { background: linear-gradient(135deg, #777, #333); border-color: #bbb; }
+        .stop-core { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #d9534f, #c9302c); display: flex; align-items: center; justify-content: center; border: 2px solid #fff; font-size: 10px; }
+        #status-text { font-weight: bold; color: #ffca28; }
+
+        /* 🌟 REDRESSAGE ULTRA-COMPACT POUR LE SAMSUNG HORIZONTAL */
+        @media (orientation: landscape) {
+            .main-container { flex-direction: row; max-width: 100%; padding: 8px; gap: 12px; }
+            .video-zone { flex: 1.1; height: 100%; border-radius: 15px; }
+            .right-panel { flex: 0.9; display: flex; flex-direction: column; justify-content: space-between; height: 100%; min-height: 0; }
+            .data-box { flex: 1; padding: 8px; font-size: 0.8rem; min-height: 0; overflow: hidden; margin-bottom: 4px; }
+            .buttons-zone { flex-shrink: 0; padding-bottom: 2px; }
+            .round-btn { width: 48px; height: 48px; font-size: 11px; border-width: 2px; }
+            .stop-core { width: 32px; height: 32px; font-size: 8px; }
+            #btn-reset svg { width: 18px; height: 18px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="video-zone"><video id="video-preview" autoplay playsinline muted></video></div>
+        <div class="right-panel">
+            <div class="data-box">
+                <div id="title-version" class="data-box-title">Données de session (30Hz) :</div>
+                <div id="live-data">LIGNE INTERNE : 1 <br>ACCEL X: 0.0 | Y: 0.0 | Z: 0.0<br>ROTATION A: 0° | B: 0° | G: 0°<br><br>TAMPON REQUIS : 0 / 30 pts</div>
+                <div id="status-text">Status : Prêt</div>
+            </div>
+            <div class="buttons-zone">
+                <div id="btn-reset" class="round-btn">
+                    <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                </div>
+                <div id="btn-rec" class="round-btn"><span id="label-rec">REC</span>
+                    <div id="icon-pause" class="pause-icon"><div class="pause-bar"></div><div class="pause-bar"></div></div>
+                </div>
+                <div id="btn-stop" class="round-btn"><div class="stop-core">STOP</div></div>
+            </div>
+        </div>
+    </div>
+<script>
+    const VERSION_APP = "V7.4";
+    const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbzYzAUmSClZKWraRq66Id7sX7F4tbH752qS7-YIGD4W0Q68COwfAVh4Ry0EUI-O0AMl/exec";
+    let etatCourant = "STOPPED", intervalId = null, resetActif = false; 
+    let indexPoint = localStorage.getItem("dernier_index_virtuel") ? parseInt(localStorage.getItem("dernier_index_virtuel")) : 1;
+    let curX = 0, curY = 0, curZ = 0, curA = 0, curB = 0, curG = 0, blocDonneesSession = [];
+
+    const video = document.getElementById('video-preview'), btnRec = document.getElementById('btn-rec');
+    const labelRec = document.getElementById('label-rec'), iconPause = document.getElementById('icon-pause');
+    const btnReset = document.getElementById('btn-reset'), btnStop = document.getElementById('btn-stop');
+    const liveDataDisplay = document.getElementById('live-data'), statusText = document.getElementById('status-text');
+    document.getElementById('title-version').innerText = "Données de session (30Hz) - " + VERSION_APP + " :";
+
+    async function demarrerCameraVideo() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+            video.srcObject = stream;
+        } catch (err) { console.error("Erreur caméra : " + err.message); }
+    }
+    demarrerCameraVideo();
+
+    window.addEventListener('devicemotion', (e) => {
+        const acc = e.accelerationIncludingGravity;
+        if (acc) { curX = acc.x || 0; curY = acc.y || 0; curZ = acc.z || 0; rafraichirVisuel(); }
+    });
+    window.addEventListener('deviceorientation', (e) => {
+        curA = e.alpha || 0; curB = e.beta || 0; curG = e.gamma || 0; rafraichirVisuel();
+    });
+
+    btnReset.addEventListener('click', () => {
+        if (etatCourant === "RECORDING") return; // Interdit de reset pendant qu'on filme
+        resetActif = !resetActif;
+        resetActif ? btnReset.classList.add('actif') : btnReset.classList.remove('actif');
+        rafraichirVisuel();
+    });
+
+    btnRec.addEventListener('click', () => {
+        if (etatCourant === "STOPPED" || etatCourant === "PAUSED") {
+            // 🌟 SÉCURITÉ DE L'INDEX : On verrouille le point de départ exact
+            if (resetActif) { 
+                indexPoint = 1; 
+                blocDonneesSession = []; 
+                resetActif = false; 
+                btnReset.classList.remove('actif');
+            } else {
+                let memoireIndex = localStorage.getItem("dernier_index_virtuel");
+                indexPoint = memoireIndex ? parseInt(memoireIndex) : 1;
+            }
+            
+            localStorage.setItem("dernier_index_virtuel", indexPoint);
+            etatCourant = "RECORDING"; statusText.innerText = "Status : Capture active...";
+            labelRec.style.display = "block"; iconPause.style.display = "none";
+            labelRec.className = "txt-vert-fluo"; btnRec.className = "round-btn"; 
+
+            intervalId = setInterval(() => {
+                let orient = (screen.orientation && screen.orientation.type.includes("landscape")) ? "LANDSCAPE" : "PORTRAIT";
+                
+                blocDonneesSession.push({ index: indexPoint, x: curX, y: curY, z: curZ, alpha: curA, beta: curB, gamma: curG, mode: orient });
+                
+                indexPoint++; // Incrémentation propre ligne par ligne à la milliseconde
+                localStorage.setItem("dernier_index_virtuel", indexPoint);
+                
+                if (blocDonneesSession.length >= 30) {
+                    envoyerFichierBlocComplet(blocDonneesSession, "CONTINUE"); 
+                    blocDonneesSession = []; 
+                }
+                rafraichirVisuel();
+            }, 33.3);
+        } else if (etatCourant === "RECORDING") {
+            etatCourant = "PAUSED"; 
+            clearInterval(intervalId); 
+            labelRec.style.display = "none"; iconPause.style.display = "flex";
+            btnRec.className = "round-btn clignote-orange";
+            
+            if (blocDonneesSession.length > 0) {
+                envoyerFichierBlocComplet(blocDonneesSession, "CONTINUE"); 
+                blocDonneesSession = [];
+            }
+            statusText.innerText = "Status : Session en pause"; 
+            rafraichirVisuel();
+        }
+    });
+    btnStop.addEventListener('click', () => {
+        if (etatCourant === "RECORDING" || etatCourant === "PAUSED") {
+            clearInterval(intervalId); etatCourant = "STOPPED";
+            statusText.innerText = "Status : Finalisation du CSV...";
+            labelRec.style.display = "block"; labelRec.className = "";
+            iconPause.style.display = "none"; btnRec.className = "round-btn";
+            
+            envoyerFichierBlocComplet(blocDonneesSession, "STOP");
+            blocDonneesSession = []; 
+            rafraichirVisuel();
+        }
+    });
+
+    function envoyerFichierBlocComplet(listePoints, actionType) {
+        if (listePoints.length === 0 && actionType !== "STOP") return;
+        let formData = new FormData();
+        formData.append("donneesBloc", JSON.stringify({ points: listePoints }));
+        formData.append("action", actionType);
+        
+        fetch(URL_GOOGLE_SCRIPT, { method: "POST", body: formData })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === "success") {
+                if (actionType === "STOP") {
+                    statusText.innerText = "Status : CSV Téléchargé ✓";
+                    window.location.href = data.download_url;
+                } else {
+                    statusText.innerText = "Status : Flux synchronisé ✓";
+                }
+            }
+        })
+        .catch(err => { console.error(err); statusText.innerText = "Status : Erreur liaison ⚠"; });
+    }
+
+    function rafraichirVisuel() {
+        let ligneCible = (resetActif && etatCourant === "STOPPED") ? 1 : indexPoint;
+        liveDataDisplay.innerHTML = 
+            "<strong>LIGNE INTERNE :</strong> " + ligneCible + "<br>" +
+            "ACCEL X: " + curX.toFixed(1) + " | Y: " + curY.toFixed(1) + " | Z: " + curZ.toFixed(1) + "<br>" +
+            "ROTATION A: " + Math.round(curA) + "° | B: " + Math.round(curB) + "° | G: " + Math.round(curG) + "°<br><br>" +
+            "<strong>TAMPON REQUIS :</strong> " + blocDonneesSession.length + " / 30 pts";
+    }
+</script>
+</body>
+</html>
