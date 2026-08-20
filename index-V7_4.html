@@ -114,71 +114,79 @@
         rafraichirVisuel();
     });
 
+    // 🌟 LE CODE CORRIGÉ ET SÉCURISÉ POUR LE BOUTON REC
     btnRec.addEventListener('click', () => {
         if (etatCourant === "STOPPED" || etatCourant === "PAUSED") {
             if (intervalId !== null) { clearInterval(intervalId); intervalId = null; }
             
-            // 🌟 LOGIQUE SÉCURISÉE : Si le bouton RESET est vert, on suspend le lancement du chrono
-        // Si le bouton RESET est vert, on suspend le lancement et on GRISERA le bouton REC
-        if (resetActif) {
-            statusText.innerText = "Status : Purge Google Sheets en cours...";
-            
-            // 🌟 LE CORRECTIF VISUEL RADICAL : On force le bouton à devenir gris foncé métallisé
-            btnRec.style.background = "#555555";
-            btnRec.style.borderColor = "#888888";
-            btnRec.style.opacity = "0.6";
-            btnRec.style.pointerEvents = "none"; // Bloque physiquement le double clic
-            labelRec.innerText = "WAIT"; // Affiche "WAIT" à la place de "REC"
-            
-            let formDataReset = new FormData();
-            formDataReset.append("action", "RESET");
-            
-            fetch(URL_GOOGLE_SCRIPT, { method: "POST", body: formDataReset })
-                .then(res => res.json())
-                .then(data => {
-                    // Uniquement quand Google confirme la purge, on réinitialise tout
-                    indexPoint = 1;
-                    localStorage.setItem("dernier_index_virtuel", 1);
-                    blocDonneesSession = [];
-                    resetActif = false;
-                    btnReset.classList.remove('actif');
-                    
-                    // 🌟 LIBÉRATION VISUELLE : On remet le bouton rouge vif d'origine
-                    btnRec.style.background = "#ff0000";
-                    btnRec.style.borderColor = "white";
-                    btnRec.style.opacity = "1";
-                    btnRec.style.pointerEvents = "auto"; // Libère le bouton
-                    labelRec.innerText = "REC";
-                    
-                    // Lancement effectif sécurisé du flux à 1 (avec notre nouveau paramètre de sécurité)
-                    demarrerCaptureFlux(1);
-                })
-                .catch(err => {
-                    console.error(err);
-                    statusText.innerText = "Status : Échec Purge Réseau ⚠";
-                    
-                    // En cas d'erreur, on restaure le bouton pour ne pas bloquer l'application
-                    btnRec.style.background = "#ff0000";
-                    btnRec.style.borderColor = "white";
-                    btnRec.style.opacity = "1";
-                    btnRec.style.pointerEvents = "auto";
-                    labelRec.innerText = "REC";
-                });
-
-            } else {
+            // 🟢 CAS N°1 : LE BOUTON DE RÉINITIALISATION EST VERT (ACTIF) -> ON PURGE
+            if (resetActif === true) {
+                statusText.innerText = "Status : Purge Google Sheets en cours...";
+                
+                // Effet visuel d'attente
+                btnRec.style.background = "#555555";
+                btnRec.style.borderColor = "#888888";
+                btnRec.style.opacity = "0.6";
+                btnRec.style.pointerEvents = "none"; 
+                labelRec.innerText = "WAIT"; 
+                
+                let formDataReset = new FormData();
+                formDataReset.append("action", "RESET");
+                
+                fetch(URL_GOOGLE_SCRIPT, { method: "POST", body: formDataReset })
+                    .then(res => res.json())
+                    .then(data => {
+                        indexPoint = 1;
+                        localStorage.setItem("dernier_index_virtuel", 1);
+                        blocDonneesSession = [];
+                        resetActif = false;
+                        btnReset.classList.remove('actif');
+                        
+                        // Restauration du bouton REC
+                        btnRec.style.background = "#ff0000";
+                        btnRec.style.borderColor = "white";
+                        btnRec.style.opacity = "1";
+                        btnRec.style.pointerEvents = "auto";
+                        labelRec.innerText = "REC";
+                        
+                        // Départ forcé à 1
+                        demarrerCaptureFlux(1);
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        statusText.innerText = "Status : Échec Purge Réseau ⚠";
+                        btnRec.style.background = "#ff0000";
+                        btnRec.style.borderColor = "white";
+                        btnRec.style.opacity = "1";
+                        btnRec.style.pointerEvents = "auto";
+                        labelRec.innerText = "REC";
+                    });
+            } 
+            // ⚪ CAS N°2 : LE BOUTON DE RÉINITIALISATION EST GRISÉ (ÉTEINT) -> REPRISE EN CONTINUITÉ
+            else {
                 let memoireIndex = localStorage.getItem("dernier_index_virtuel");
                 let indexReprise = memoireIndex ? parseInt(memoireIndex) : 1;
                 blocDonneesSession = [];
                 
-                // 🌟 ON CONTINUE À LA SUITE LOGIQUE DE LA MÉMOIRE
+                // On démarre directement sans appeler le réseau Google à l'aide de l'index de reprise
                 demarrerCaptureFlux(indexReprise);
             }
-
+            
         } else if (etatCourant === "RECORDING") {
-            etatCourant = "PAUSED"; clearInterval(intervalId); intervalId = null; 
-            labelRec.style.display = "none"; iconPause.style.display = "flex"; btnRec.className = "round-btn clignote-orange";
-            if (blocDonneesSession.length > 0) { envoyerFichierBlocComplet(blocDonneesSession, "CONTINUE"); blocDonneesSession = []; }
-            statusText.innerText = "Status : Session en pause"; rafraichirVisuel();
+            // Logique de mise en pause (votre code d'origine ultra-propre)
+            etatCourant = "PAUSED"; 
+            clearInterval(intervalId); 
+            intervalId = null; 
+            
+            labelRec.style.display = "none"; iconPause.style.display = "flex";
+            btnRec.className = "round-btn clignote-orange";
+            
+            if (blocDonneesSession.length > 0) {
+                envoyerFichierBlocComplet(blocDonneesSession, "CONTINUE"); 
+                blocDonneesSession = []; 
+            }
+            statusText.innerText = "Status : Session en pause"; 
+            rafraichirVisuel();
         }
     });
 
