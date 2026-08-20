@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Moniteur Virtual Cam Pro - V6.2</title>
+    <style>
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; background: #5b9bd5; font-family: -apple-system, sans-serif; min-height: 100vh; color: white; }
+        .main-container { display: flex; flex-direction: row; width: 100%; min-height: 100vh; padding: 15px; gap: 15px; }
+        
+        /* Fenêtre de la caméra à gauche */
+        .video-zone { flex: 1.3; background: #000; border-radius: 30px; border: 3px solid #1f4e79; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        #video-preview { width: 100%; height: 100%; object-fit: contain; background: #000; }
+        
+        /* Zone de contrôle à droite */
+        .control-zone { flex: 0.7; display: flex; flex-direction: column; justify-content: space-between; gap: 15px; }
+        .data-box { background: rgba(0, 0, 0, 0.85); border: 2px solid #aaa; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; line-height: 1.5; text-align: left; }
+        .data-box-title { border-bottom: 1px solid #555; padding-bottom: 6px; margin-bottom: 8px; font-weight: bold; color: #ddd; }
+        
+        /* Boutons d'action */
+        .buttons-zone { display: flex; justify-content: center; align-items: center; gap: 30px; padding-bottom: 10px; }
+        .round-btn { position: relative; width: 70px; height: 70px; border-radius: 50%; border: 4px solid white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); transition: transform 0.1s; }
+        .round-btn:active { transform: scale(0.92); }
+        #btn-rec { background: #ff0000; color: white; }
+        .txt-vert-fluo { color: #39ff14; text-shadow: 0 0 8px #39ff14; }
+        
+        /* Icône de Pause */
+        .pause-icon { display: none; width: 22px; height: 26px; justify-content: space-between; }
+        .pause-bar { width: 8px; height: 100%; background: #ffa500; border-radius: 2px; }
+        .clignote-orange .pause-bar { animation: blinkOrange 1s infinite; }
+        @keyframes blinkOrange { 50% { background: #ff4500; } }
+        
+        /* Bouton Reset Fléché */
+        .btn-reset { width: 60px; height: 60px; border-radius: 50%; background: #222; border: 4px solid #666; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .btn-reset.actif { border-color: #39ff14; background: #111; }
+        .btn-reset svg { width: 26px; height: 26px; fill: #666; transition: 0.2s; }
+        .btn-reset.actif svg { fill: #39ff14; }
+        #status-text { font-weight: bold; color: #ffca28; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="video-zone"><video id="video-preview" autoplay playsinline muted></video></div>
+        <div class="control-zone">
+            <div class="data-box">
+                <div id="title-version" class="data-box-title">Données de session (30Hz) :</div>
+                <div id="live-data">LIGNE INTERNE : 1 <br>ACCEL X: 0.0 | Y: 0.0 | Z: 0.0<br>ROTATION A: 0° | B: 0° | G: 0°</div>
+                <div id="status-text">Status : Prêt</div>
+            </div>
+            <div class="buttons-zone">
+                <div id="btn-rec" class="round-btn"><span id="label-rec">REC</span>
+                    <div id="icon-pause" class="pause-icon"><div class="pause-bar"></div><div class="pause-bar"></div></div>
+                </div>
+                <div id="btn-reset" class="btn-reset" title="Réinitialiser au début">
+                    <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+<script>
+
+        const VERSION_APP = "V6.3";
+        const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbygRjIAbqh1IJl3emod_44X915NYm_iG9QNySMJugFPK_J8Sq-_qUsRNbLKqE3198Y/exec";
+
+        let etatCourant = "STOPPED", intervalId = null, resetActif = false; 
+        let indexSauvegarde = localStorage.getItem("dernier_index_virtuel");
+        let indexPoint = indexSauvegarde ? parseInt(indexSauvegarde) : 1;
+        let curX = 0, curY = 0, curZ = 0, curA = 0, curB = 0, curG = 0, blocDonneesSession = [];
+
+        const video = document.getElementById('video-preview'), btnRec = document.getElementById('btn-rec');
+        const labelRec = document.getElementById('label-rec'), iconPause = document.getElementById('icon-pause');
+        const btnReset = document.getElementById('btn-reset'), liveDataDisplay = document.getElementById('live-data');
+        const statusText = document.getElementById('status-text'), titleVersion = document.getElementById('title-version');
+
+        titleVersion.innerText = "Données de session (30Hz) - " + VERSION_APP + " :";
+
+        async function demarrerCameraVideo() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+                video.srcObject = stream;
+            } catch (err) { console.error("Erreur caméra : " + err.message); }
+        }
+        demarrerCameraVideo();
+
+        window.addEventListener('devicemotion', (e) => {
+            const acc = e.accelerationIncludingGravity;
+            if (acc) { curX = acc.x || 0; curY = acc.y || 0; curZ = acc.z || 0; rafraichirVisuel(); }
+        });
+        window.addEventListener('deviceorientation', (e) => {
+            curA = e.alpha || 0; curB = e.beta || 0; curG = e.gamma || 0; rafraichirVisuel();
+        });
+
+		btnReset.addEventListener('click', () => {
+			resetActif = !resetActif;
+				if (resetActif) { 
+					btnReset.classList.add('actif'); 
+				} else { 
+					btnReset.classList.remove('actif'); 
+				}
+				rafraichirVisuel(); // Met simplement à jour l'affichage sans écraser la mémoire
+		});
+
+		btnRec.addEventListener('click', () => {
+			if (etatCourant === "STOPPED" || etatCourant === "PAUSED") {
+				
+				// 🌟 SI LE RESET EST VERT (ACTIF) : ON REPART À 1
+				if (resetActif) { 
+					indexPoint = 1; 
+					localStorage.setItem("dernier_index_virtuel", 1); 
+					blocDonneesSession = []; 
+					
+					// On l'éteint automatiquement pour la session en cours
+					resetActif = false;
+					btnReset.classList.remove('actif');
+				} else {
+					// 🌟 SI LE RESET EST GRISÉ : ON REPREND EN CONTINUITÉ
+					let indexSauvegarde = localStorage.getItem("dernier_index_virtuel");
+					indexPoint = indexSauvegarde ? parseInt(indexSauvegarde) : 1;
+					
+					blocDonneesSession = []; 
+				}
+				
+				etatCourant = "RECORDING";
+				statusText.innerText = "Status : Capture active...";
+				labelRec.style.display = "block"; iconPause.style.display = "none";
+				labelRec.className = "txt-vert-fluo"; btnRec.className = "round-btn"; 
+
+				intervalId = setInterval(() => {
+					// 🌟 Détection de l'orientation en direct à chaque trentième de seconde
+					let modeOrientation = (screen.orientation && screen.orientation.type.includes("landscape")) ? "LANDSCAPE" : "PORTRAIT";
+
+					// Injection dans le tampon avec la nouvelle variable 'mode' en fin d'objet
+					blocDonneesSession.push({ index: indexPoint, x: curX, y: curY, z: curZ, alpha: curA, beta: curB, gamma: curG, mode: modeOrientation });
+					indexPoint++;
+
+					localStorage.setItem("dernier_index_virtuel", indexPoint);
+					
+					if (blocDonneesSession.length >= 30) {
+						envoyerFichierBlocComplet(blocDonneesSession);
+						blocDonneesSession = []; 
+					}
+					rafraichirVisuel();
+				}, 33.3);
+				
+			} else if (etatCourant === "RECORDING") {
+				etatCourant = "PAUSED";
+				clearInterval(intervalId); 
+				labelRec.style.display = "none"; iconPause.style.display = "flex";
+				btnRec.className = "round-btn clignote-orange";
+				
+				if (blocDonneesSession.length > 0) {
+					envoyerFichierBlocComplet(blocDonneesSession);
+					blocDonneesSession = [];
+				}
+				statusText.innerText = "Status : Session mise en pause !";
+				rafraichirVisuel();
+			}
+		});
+
+		function rafraichirVisuel() {
+			let ligneCible = (resetActif && etatCourant === "STOPPED") ? 1 : indexPoint;
+			
+			// 🔥 CORRECTION : On affiche le nombre exact de points actuellement bloqués dans le téléphone
+			let pointsDansLeTampon = blocDonneesSession.length;
+
+			liveDataDisplay.innerHTML = 
+				"<strong>LIGNE INTERNE :</strong> " + ligneCible + "<br>" +
+				"ACCEL X: " + curX.toFixed(1) + " | Y: " + curY.toFixed(1) + " | Z: " + curZ.toFixed(1) + "<br>" +
+				"ROTATION A: " + Math.round(curA) + "° | B: " + Math.round(curB) + "° | G: " + Math.round(curG) + "°<br><br>" +
+				"<strong>TAMPON REQUIS :</strong> " + pointsDansLeTampon + " / 30 pts";
+		}
+
+        function envoyerFichierBlocComplet(listePoints) {
+            if (listePoints.length === 0) return;
+            statusText.innerText = "Status : Envoi séquentiel...";
+            let formData = new FormData();
+            formData.append("donneesBloc", JSON.stringify({ points: listePoints }));
+            fetch(URL_GOOGLE_SCRIPT, { method: "POST", mode: "no-cors", body: formData })
+            .then(() => { statusText.innerText = "Status : Flux synchronisé ✓"; })
+            .catch(err => { console.error(err); statusText.innerText = "Status : Micro-coupure ⚠️"; });
+        }
+    </script>
+</body>
+</html>
