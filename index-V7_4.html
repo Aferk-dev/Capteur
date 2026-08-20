@@ -51,7 +51,7 @@
         <div class="right-panel">
             <div class="data-box">
                 <div id="title-version" class="data-box-title">Données de session (30Hz) :</div>
-                <div id="live-data">LIGNE INTERNE : 1 <br>ACCEL X: 0.0 | Y: 0.0 | Z: 0.0<br>ROTATION A: 0° | B: 0° | G: 0°<br><br>TAMPON REQUIS : 0 / 30 pts</div>
+                <div id="live-data">LIGNE INTERNE : 1 <br>AC: X: 0.0 | Y: 0.0 | Z: 0.0<br>ROT A: 0° | B: 0° | G: 0°<br>TAMPON REQUIS : 0 / 30 pts</div>
                 <div id="status-text">Status : Prêt</div>
             </div>
             <div class="buttons-zone">
@@ -76,7 +76,7 @@
     const labelRec = document.getElementById('label-rec'), iconPause = document.getElementById('icon-pause');
     const btnReset = document.getElementById('btn-reset'), btnStop = document.getElementById('btn-stop');
     const liveDataDisplay = document.getElementById('live-data'), statusText = document.getElementById('status-text');
-    document.getElementById('title-version').innerText = "Données de session (30Hz) - " + VERSION_APP + " :";
+    document.getElementById('title-version').innerText = "Data (30Hz) - " + VERSION_APP + " :";
 
     async function demarrerCameraVideo() {
         try {
@@ -143,14 +143,14 @@
                 envoyerFichierBlocComplet(blocDonneesSession, "CONTINUE"); 
                 blocDonneesSession = [];
             }
-            statusText.innerText = "Status : Session en pause"; 
+            statusText.innerText = "Status : En Pause"; 
             rafraichirVisuel();
         }
     });
     btnStop.addEventListener('click', () => {
         if (etatCourant === "RECORDING" || etatCourant === "PAUSED") {
             clearInterval(intervalId); etatCourant = "STOPPED";
-            statusText.innerText = "Status : Finalisation du CSV...";
+            statusText.innerText = "Status : CSV ...";
             labelRec.style.display = "block"; labelRec.className = "";
             iconPause.style.display = "none"; btnRec.className = "round-btn";
             
@@ -172,13 +172,21 @@
             if (data.status === "success") {
                 if (actionType === "STOP") {
                     statusText.innerText = "Status : CSV Téléchargé ✓";
+                    
+                    // 🌟 SÉCURITÉ COMPORTEMENTALE : On tente le téléchargement automatique
                     window.location.href = data.download_url;
+                    
+                    // 🌟 ALERTE DE SECOURS : Si le pop-up est bloqué par le Samsung, on affiche un lien cliquable au bout de 1,5s
+                    setTimeout(() => {
+                        statusText.innerHTML = "Status : <a href='" + data.download_url + "' target='_blank' style='color:#ffca28; font-weight:bold; text-decoration:underline;'>Clic ici si le pop-up est bloqué 📥</a>";
+                    }, 1500);
+                    
                 } else {
-                    statusText.innerText = "Status : Flux synchronisé ✓";
+                    statusText.innerText = "Status : Flux synch ✓";
                 }
             }
         })
-        .catch(err => { console.error(err); statusText.innerText = "Status : Erreur liaison ⚠"; });
+        .catch(err => { console.error(err); statusText.innerText = "Status : Bad liaison ⚠"; });
     }
 
     function rafraichirVisuel() {
@@ -192,3 +200,4 @@
 </script>
 </body>
 </html>
+
