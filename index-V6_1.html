@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Moniteur Virtual Cam Pro - V6 Stable</title>
+    <title>Moniteur Virtual Cam Pro - V6 Stable Continu</title>
     <style>
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; background: #5b9bd5; font-family: -apple-system, sans-serif; min-height: 100vh; color: white; }
@@ -66,9 +66,8 @@
         let etatCourant = "STOPPED"; 
         let intervalId = null;
         let indexPoint = 1;
-        let resetActif = false; // Grisé par défaut au démarrage
+        let resetActif = false; 
         
-        // Reprise des variables brutes isolées de la V5
         let curX = 0, curY = 0, curZ = 0;
         let curA = 0, curB = 0, curG = 0;
         let blocDonneesSession = [];
@@ -82,7 +81,6 @@
         const statusText = document.getElementById('status-text');
         const titleVersion = document.getElementById('title-version');
 
-        // Affichage sécurisé de la version
         titleVersion.innerText = "Données de session (30Hz) - " + VERSION_APP + " :";
 
         async function demarrerCameraVideo() {
@@ -132,10 +130,15 @@
 
         btnRec.addEventListener('click', () => {
             if (etatCourant === "STOPPED" || etatCourant === "PAUSED") {
-                if (resetActif && etatCourant === "STOPPED") { 
+                
+                // 🔥 LOGIQUE SÉCURISÉE : Si le bouton vert est actif ou si l'app démarre pour la première fois
+                if (resetActif || etatCourant === "STOPPED") { 
                     indexPoint = 1; 
-                    blocDonneesSession = []; 
                 }
+                
+                // 🔥 Très important : On nettoie le conteneur temporaire pour la nouvelle session de capture
+                blocDonneesSession = [];
+                
                 etatCourant = "RECORDING";
                 statusText.innerText = "Status : Capture active...";
                 
@@ -159,6 +162,7 @@
                 }, 33.3);
 
             } else if (etatCourant === "RECORDING") {
+                // PASSAGE EN PAUSE
                 etatCourant = "PAUSED";
                 clearInterval(intervalId); 
 
@@ -166,10 +170,15 @@
                 iconPause.style.display = "flex";
                 btnRec.className = "round-btn clignote-orange";
                 
+                // Envoi immédiat du bloc en mémoire
                 envoyerFichierBlocComplet(blocDonneesSession);
                 
+                // 🔥 Si le bouton vert était enclenché, on réinitialise à 1 pour le prochain REC.
+                // 🔥 SINON : On ne touche à rien ! 'indexPoint' conserve sa valeur finale (ex: 185) pour continuer à la suite.
                 if (resetActif) { 
-                    indexPoint = 1; 
+                    indexPoint = 1;
+                    resetActif = false;
+                    btnReset.classList.remove('actif');
                 }
             }
             rafraichirVisuel();
@@ -200,12 +209,3 @@
             })
             .then(() => {
                 statusText.innerText = "Status : ✓ Bloc transmis !";
-            })
-            .catch(err => {
-                console.error(err);
-                statusText.innerText = "Status : ⚠️ Erreur réseau";
-            });
-        }
-    </script>
-</body>
-</html>
