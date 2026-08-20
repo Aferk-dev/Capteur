@@ -261,8 +261,14 @@
         });
     }
 
-    function rafraichirVisuel() {
-        let ligneCible = (resetActif && etatCourant === "STOPPED") ? 1 : indexPoint;
+	function rafraichirVisuel() {
+		// 🌟 CORRECTIF DIRECT : On affiche la valeur réelle de indexPoint en temps réel.
+		// Comme le nouveau bouton REC écrase indexPoint à 1 dès la première milliseconde du clic,
+		// l'écran affichera immédiatement "1" pendant toute la durée du message "WAIT".
+		let ligneCible = indexPoint;
+		
+		let pointsDansLeTampon = blocDonneesSession.length;
+		
         liveDataDisplay.innerHTML = 
             "<strong>LIGNE INTERNE :</strong> " + ligneCible + "<br>" +
             "ACCEL X: " + curX.toFixed(1) + " | Y: " + curY.toFixed(1) + " | Z: " + curZ.toFixed(1) + "<br>" +
