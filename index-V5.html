@@ -3,38 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Moniteur Virtual Cam Pro - V5</title>
+    <title>Moniteur Virtual Cam Pro - Adaptatif</title>
     <style>
         * { box-sizing: border-box; }
-        body { font-family: -apple-system, sans-serif; margin: 0; padding: 0; background: #5b9bd5; height: 100vh; overflow: hidden; color: white; }
-        .main-container { display: flex; width: 100vw; height: 100vh; padding: 15px; gap: 15px; }
-        .video-zone { flex: 1.3; background: #111; border-radius: 40px; border: 3px solid #1f4e79; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
-        #video-preview { width: 100%; height: 100%; object-fit: contain; background: #000; }
-        .control-zone { flex: 0.7; display: flex; flex-direction: column; justify-content: space-between; padding: 5px 0; }
+        
+        /* 🔥 On laisse la page respirer normalement sans rien figer */
+        html, body { margin: 0; padding: 0; background: #5b9bd5; font-family: -apple-system, sans-serif; min-height: 100vh; color: white; }
+        
+        /* Grille adaptative qui s'ajuste à l'écran du téléphone */
+        .main-container { 
+            display: flex; 
+            flex-direction: row; 
+            width: 100%; 
+            min-height: 100vh; 
+            padding: 15px; 
+            gap: 15px; 
+        }
+        
+        /* CÔTÉ GAUCHE : Zone Caméra 100% dédiée et adaptative */
+        .video-zone { 
+            flex: 1.3; 
+            background: #000; 
+            border-radius: 30px; 
+            border: 3px solid #1f4e79; 
+            overflow: hidden; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+        }
+        
+        /* 🔥 "contain" garantit que 100% de l'image est visible sans aucune perte ni rognage */
+        #video-preview { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: contain; 
+            background: #000; 
+        }
+        
+        /* CÔTÉ DROIT : Panneau de contrôle qui s'adapte en hauteur */
+        .control-zone { 
+            flex: 0.7; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-between; 
+            gap: 15px;
+        }
+        
+        /* Boîtier de texte des données */
         .data-box { background: rgba(0, 0, 0, 0.85); border: 2px solid #aaa; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; line-height: 1.5; text-align: left; }
         .data-box-title { border-bottom: 1px solid #555; padding-bottom: 6px; margin-bottom: 8px; font-weight: bold; color: #ddd; }
-        .buttons-zone { display: flex; justify-content: center; align-items: center; gap: 40px; margin-bottom: 20px; }
-        .round-btn { position: relative; width: 75px; height: 75px; border-radius: 50%; border: 4px solid white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); transition: transform 0.1s; }
+        
+        /* Zone des boutons de commande */
+        .buttons-zone { display: flex; justify-content: center; align-items: center; gap: 30px; padding-bottom: 10px; }
+        
+        /* Style des boutons circulaires */
+        .round-btn { position: relative; width: 70px; height: 70px; border-radius: 50%; border: 4px solid white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); transition: transform 0.1s; }
         .round-btn:active { transform: scale(0.92); }
+        
         #btn-rec { background: #ff0000; color: white; }
         .txt-vert-fluo { color: #39ff14; text-shadow: 0 0 8px #39ff14; }
+        
         .pause-icon { display: none; width: 22px; height: 26px; justify-content: space-between; }
         .pause-bar { width: 8px; height: 100%; background: #ffa500; border-radius: 2px; }
+        
         .clignote-orange .pause-bar { animation: blinkOrange 1s infinite; }
         @keyframes blinkOrange { 50% { background: #ff4500; } }
-        .btn-reset { width: 65px; height: 65px; border-radius: 50%; background: #222; border: 4px solid #666; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+
+        .btn-reset { width: 60px; height: 60px; border-radius: 50%; background: #222; border: 4px solid #666; display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .btn-reset.actif { border-color: #39ff14; background: #111; }
-        .btn-reset svg { width: 30px; height: 30px; fill: #666; }
+        .btn-reset svg { width: 26px; height: 26px; fill: #666; }
         .btn-reset.actif svg { fill: #39ff14; }
     </style>
 </head>
 <body>
 
     <div class="main-container">
+        <!-- CÔTÉ GAUCHE : S'ADAPTE SANS PERDRE UN SEUL PIXEL -->
         <div class="video-zone">
             <video id="video-preview" autoplay playsinline muted></video>
         </div>
 
+        <!-- CÔTÉ DROIT : S'ADAPTE FLUIDEMENT -->
         <div class="control-zone">
             <div class="data-box">
                 <div class="data-box-title">Données vers Drive (30Hz) :</div>
@@ -46,7 +95,8 @@
             </div>
 
             <div class="buttons-zone">
-                <div id="btn-rec" class="round-btn"><span id="label-rec">REC</span>
+                <div id="btn-rec" class="round-btn">
+                    <span id="label-rec">REC</span>
                     <div id="icon-pause" class="pause-icon"><div class="pause-bar"></div><div class="pause-bar"></div></div>
                 </div>
                 <div id="btn-reset" class="btn-reset actif">
@@ -72,25 +122,19 @@
         const btnReset = document.getElementById('btn-reset');
         const liveDataDisplay = document.getElementById('live-data');
 
-        // 🔥 FORCE L'ACCÈS MATÉRIEL DE MANIÈRE UNIVERSELLE
-        function initialiserMedia() {
-            navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "environment" },
-                audio: false
-            })
-            .then((stream) => {
+        async function demarrerCameraVideo() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: "environment" } },
+                    audio: false
+                });
                 video.srcObject = stream;
-                video.setAttribute('playsinline', 'true');
-                video.setAttribute('muted', 'true');
-                video.play().catch(e => console.log("Play bloqué:", e));
-            })
-            .catch((err) => {
-                alert("Erreur Caméra. Vérifiez les permissions du site : " + err.name);
-            });
+            } catch (err) {
+                console.error("Erreur caméra : " + err.message);
+            }
         }
-
-        // Lancement immédiat au chargement
-        window.addEventListener('DOMContentLoaded', initialiserMedia);
+        
+        demarrerCameraVideo();
 
         // Capteurs
         window.addEventListener('devicemotion', (e) => {
@@ -118,11 +162,6 @@
         });
 
         btnRec.addEventListener('click', () => {
-            // Plein écran standard
-            if (document.documentElement.requestFullscreen) {
-                document.documentElement.requestFullscreen().catch(err => console.log(err));
-            }
-
             if (etatCourant === "STOPPED" || etatCourant === "PAUSED") {
                 if (resetActif && etatCourant === "STOPPED") { indexPoint = 1; }
                 etatCourant = "RECORDING";
