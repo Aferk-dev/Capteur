@@ -164,12 +164,12 @@
             } 
             // ⚪ CAS N°2 : LE BOUTON DE RÉINITIALISATION EST GRISÉ (ÉTEINT) -> REPRISE EN CONTINUITÉ
             else {
-                let memoireIndex = localStorage.getItem("dernier_index_virtuel");
-                let indexReprise = memoireIndex ? parseInt(memoireIndex) : 1;
+                // 🌟 CORRECTION DE SÉCURITÉ : On ne va plus chercher le localStorage au clic !
+                // On démarre directement avec la valeur 'indexPoint' actuelle (qui vaut soit 1 si purgé, soit la vraie suite)
                 blocDonneesSession = [];
                 
-                // On démarre directement sans appeler le réseau Google à l'aide de l'index de reprise
-                demarrerCaptureFlux(indexReprise);
+                // On lance le flux à la suite exacte affichée à l'écran
+                demarrerCaptureFlux(indexPoint);
             }
             
         } else if (etatCourant === "RECORDING") {
