@@ -190,9 +190,11 @@
         });
 
         function rafraichirVisuel() {
-            let ligneCible = (resetActif && etatCourant === "STOPPED") ? 1 : indexPoint;
+            // Calcule la ligne cible réelle selon l'état du bouton Reset et de l'enregistrement
+            let ligneAffichee = (resetActif && etatCourant === "STOPPED") ? 1 : indexPoint;
+            
             liveDataDisplay.innerHTML = `
-                <strong>LIGNE CIBLE :</strong> ${ligneCible} <br>
+                <strong>LIGNE CIBLE :</strong> ${ligneAffichee} <br>
                 <strong>ACCEL :</strong> X: ${mesuresCourantes.x.toFixed(1)} | Y: ${mesuresCourantes.y.toFixed(1)} | Z: ${mesuresCourantes.z.toFixed(1)} <br>
                 <strong>ROTATION :</strong> A: ${mesuresCourantes.alpha.toFixed(0)}° | B: ${mesuresCourantes.beta.toFixed(0)}° | G: ${mesuresCourantes.gamma.toFixed(0)}°
             `;
