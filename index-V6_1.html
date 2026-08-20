@@ -60,7 +60,8 @@
     </div>
 
     <script>
-        const VERSION_APP = "V6_1";
+        // LIGNE 74 : Votre URL Google Script
+        const VERSION_APP = "V6_2";
         const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbwtYmHKl6Nqy2nSqRedR7oilB8DznzlKcwbnbsaUUNIfxDAoRAofa55wbOWFv8HUX-y/exec";
 
         let etatCourant = "STOPPED"; 
@@ -130,15 +131,10 @@
 
         btnRec.addEventListener('click', () => {
             if (etatCourant === "STOPPED" || etatCourant === "PAUSED") {
-                
-                // 🔥 LOGIQUE SÉCURISÉE : Si le bouton vert est actif ou si l'app démarre pour la première fois
                 if (resetActif || etatCourant === "STOPPED") { 
                     indexPoint = 1; 
                 }
-                
-                // 🔥 Très important : On nettoie le conteneur temporaire pour la nouvelle session de capture
                 blocDonneesSession = [];
-                
                 etatCourant = "RECORDING";
                 statusText.innerText = "Status : Capture active...";
                 
@@ -162,7 +158,6 @@
                 }, 33.3);
 
             } else if (etatCourant === "RECORDING") {
-                // PASSAGE EN PAUSE
                 etatCourant = "PAUSED";
                 clearInterval(intervalId); 
 
@@ -170,11 +165,8 @@
                 iconPause.style.display = "flex";
                 btnRec.className = "round-btn clignote-orange";
                 
-                // Envoi immédiat du bloc en mémoire
                 envoyerFichierBlocComplet(blocDonneesSession);
                 
-                // 🔥 Si le bouton vert était enclenché, on réinitialise à 1 pour le prochain REC.
-                // 🔥 SINON : On ne touche à rien ! 'indexPoint' conserve sa valeur finale (ex: 185) pour continuer à la suite.
                 if (resetActif) { 
                     indexPoint = 1;
                     resetActif = false;
@@ -186,8 +178,6 @@
 
         function rafraichirVisuel() {
             let ligneCible = (resetActif && etatCourant === "STOPPED") ? 1 : indexPoint;
-            
-            // 🔥 Version nettoyée de tout accent grave pour débloquer Android
             liveDataDisplay.innerHTML = 
                 "<strong>LIGNE INTERNE :</strong> " + ligneCible + " <br>" +
                 "<strong>ACCEL X:</strong> " + curX.toFixed(1) + " | Y: " + curY.toFixed(1) + " | Z: " + curZ.toFixed(1) + " <br>" +
@@ -207,6 +197,9 @@
                 method: "POST",
                 mode: "no-cors",
                 body: formData
+            })
+            .then(() => {
+                statusText.innerText = "Status : ✓ Bloc transmis !";
             })
             .catch(err => {
                 console.error(err);
