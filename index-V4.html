@@ -150,6 +150,12 @@
 
         // Logique de commande du bouton REC Principal
         btnRec.addEventListener('click', async () => {
+
+            //🔥 Demande au téléphone de masquer instantanément toutes les barres du navigateur
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(err => console.log(err));
+            }
+
             if (!video.srcObject) {
                 await demarrerCameraVideo();
             }
