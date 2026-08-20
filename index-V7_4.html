@@ -119,39 +119,61 @@
             if (intervalId !== null) { clearInterval(intervalId); intervalId = null; }
             
             // 🌟 LOGIQUE SÉCURISÉE : Si le bouton RESET est vert, on suspend le lancement du chrono
-            if (resetActif) {
-                statusText.innerText = "Status : Purge Google Sheets en cours...";
-                btnRec.style.pointerEvents = "none"; // Bloque le bouton pendant le traitement
-                
-                let formDataReset = new FormData();
-                formDataReset.append("action", "RESET");
-                
-                fetch(URL_GOOGLE_SCRIPT, { method: "POST", body: formDataReset })
-                    .then(res => res.json())
-                    .then(data => {
-                        // Uniquement quand Google confirme la purge, on réinitialise à 1 de force partout
-                        indexPoint = 1;
-                        localStorage.setItem("dernier_index_virtuel", 1);
-                        blocDonneesSession = [];
-                        resetActif = false;
-                        btnReset.classList.remove('actif');
-                        btnRec.style.pointerEvents = "auto"; // Libère le bouton
-                        
-                        // Lancement effectif sécurisé du flux à 1
-                        demarrerCaptureFlux();
-                    })
-                    .catch(err => {
-                        console.error(err);
-                        statusText.innerText = "Status : Échec Purge Réseau ⚠";
-                        btnRec.style.pointerEvents = "auto";
-                    });
+        // Si le bouton RESET est vert, on suspend le lancement et on GRISERA le bouton REC
+        if (resetActif) {
+            statusText.innerText = "Status : Purge Google Sheets en cours...";
+            
+            // 🌟 LE CORRECTIF VISUEL RADICAL : On force le bouton à devenir gris foncé métallisé
+            btnRec.style.background = "#555555";
+            btnRec.style.borderColor = "#888888";
+            btnRec.style.opacity = "0.6";
+            btnRec.style.pointerEvents = "none"; // Bloque physiquement le double clic
+            labelRec.innerText = "WAIT"; // Affiche "WAIT" à la place de "REC"
+            
+            let formDataReset = new FormData();
+            formDataReset.append("action", "RESET");
+            
+            fetch(URL_GOOGLE_SCRIPT, { method: "POST", body: formDataReset })
+                .then(res => res.json())
+                .then(data => {
+                    // Uniquement quand Google confirme la purge, on réinitialise tout
+                    indexPoint = 1;
+                    localStorage.setItem("dernier_index_virtuel", 1);
+                    blocDonneesSession = [];
+                    resetActif = false;
+                    btnReset.classList.remove('actif');
+                    
+                    // 🌟 LIBÉRATION VISUELLE : On remet le bouton rouge vif d'origine
+                    btnRec.style.background = "#ff0000";
+                    btnRec.style.borderColor = "white";
+                    btnRec.style.opacity = "1";
+                    btnRec.style.pointerEvents = "auto"; // Libère le bouton
+                    labelRec.innerText = "REC";
+                    
+                    // Lancement effectif sécurisé du flux à 1 (avec notre nouveau paramètre de sécurité)
+                    demarrerCaptureFlux(1);
+                })
+                .catch(err => {
+                    console.error(err);
+                    statusText.innerText = "Status : Échec Purge Réseau ⚠";
+                    
+                    // En cas d'erreur, on restaure le bouton pour ne pas bloquer l'application
+                    btnRec.style.background = "#ff0000";
+                    btnRec.style.borderColor = "white";
+                    btnRec.style.opacity = "1";
+                    btnRec.style.pointerEvents = "auto";
+                    labelRec.innerText = "REC";
+                });
+
             } else {
-                // Si pas de reset, chargement classique continu
                 let memoireIndex = localStorage.getItem("dernier_index_virtuel");
-                indexPoint = memoireIndex ? parseInt(memoireIndex) : 1;
+                let indexReprise = memoireIndex ? parseInt(memoireIndex) : 1;
                 blocDonneesSession = [];
-                demarrerCaptureFlux();
+                
+                // 🌟 ON CONTINUE À LA SUITE LOGIQUE DE LA MÉMOIRE
+                demarrerCaptureFlux(indexReprise);
             }
+
         } else if (etatCourant === "RECORDING") {
             etatCourant = "PAUSED"; clearInterval(intervalId); intervalId = null; 
             labelRec.style.display = "none"; iconPause.style.display = "flex"; btnRec.className = "round-btn clignote-orange";
@@ -160,25 +182,31 @@
         }
     });
 
-    // 🌟 FONCTION AUXILIAIRE : Déclenche le chronomètre proprement
-	function demarrerCaptureFlux() {
-		etatCourant = "RECORDING"; statusText.innerText = "Status : Capture active...";
-		labelRec.style.display = "block"; iconPause.style.display = "none";
-		labelRec.className = "txt-vert-fluo"; btnRec.className = "round-btn"; 
+    // 🌟 CORRECTION DE SÉCURITÉ : On force la fonction à recevoir l'index de départ exact
+    function demarrerCaptureFlux(indexDeDepart) {
+        indexPoint = indexDeDepart; // Assigne immédiatement l'index (1 ou la suite)
+        localStorage.setItem("dernier_index_virtuel", indexPoint);
 
-		intervalId = setInterval(() => {
-			let orient = (screen.orientation && screen.orientation.type.includes("landscape")) ? "LANDSCAPE" : "PORTRAIT";
-			blocDonneesSession.push({ index: indexPoint, x: curX, y: curY, z: curZ, alpha: curA, beta: curB, gamma: curG, mode: orient });
-			indexPoint++;
-			localStorage.setItem("dernier_index_virtuel", indexPoint);
-			
-			if (blocDonneesSession.length >= 30) {
-				envoyerFichierBlocComplet(blocDonneesSession, "CONTINUE"); 
-				blocDonneesSession = []; 
-			}
-			rafraichirVisuel();
-		}, 33.3);
-	} 
+        etatCourant = "RECORDING"; 
+        statusText.innerText = "Status : Capture active...";
+        labelRec.style.display = "block"; iconPause.style.display = "none";
+        labelRec.className = "txt-vert-fluo"; btnRec.className = "round-btn"; 
+
+        intervalId = setInterval(() => {
+            let orient = (screen.orientation && screen.orientation.type.includes("landscape")) ? "LANDSCAPE" : "PORTRAIT";
+            
+            blocDonneesSession.push({ index: indexPoint, x: curX, y: curY, z: curZ, alpha: curA, beta: curB, gamma: curG, mode: orient });
+            
+            indexPoint++;
+            localStorage.setItem("dernier_index_virtuel", indexPoint);
+            
+            if (blocDonneesSession.length >= 30) {
+                envoyerFichierBlocComplet(blocDonneesSession, "CONTINUE"); 
+                blocDonneesSession = []; 
+            }
+            rafraichirVisuel();
+        }, 33.3);
+    }
 
 	// Bloc n°4
     btnStop.addEventListener('click', () => {
