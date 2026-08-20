@@ -3,25 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Moniteur Virtual Cam Pro - V6.1</title>
+    <title>Moniteur Virtual Cam Pro - V6.2</title>
     <style>
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; background: #5b9bd5; font-family: -apple-system, sans-serif; min-height: 100vh; color: white; }
         .main-container { display: flex; flex-direction: row; width: 100%; min-height: 100vh; padding: 15px; gap: 15px; }
+        
+        /* Fenêtre de la caméra à gauche */
         .video-zone { flex: 1.3; background: #000; border-radius: 30px; border: 3px solid #1f4e79; overflow: hidden; display: flex; align-items: center; justify-content: center; }
         #video-preview { width: 100%; height: 100%; object-fit: contain; background: #000; }
+        
+        /* Zone de contrôle à droite */
         .control-zone { flex: 0.7; display: flex; flex-direction: column; justify-content: space-between; gap: 15px; }
         .data-box { background: rgba(0, 0, 0, 0.85); border: 2px solid #aaa; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; line-height: 1.5; text-align: left; }
         .data-box-title { border-bottom: 1px solid #555; padding-bottom: 6px; margin-bottom: 8px; font-weight: bold; color: #ddd; }
+        
+        /* Boutons d'action */
         .buttons-zone { display: flex; justify-content: center; align-items: center; gap: 30px; padding-bottom: 10px; }
         .round-btn { position: relative; width: 70px; height: 70px; border-radius: 50%; border: 4px solid white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); transition: transform 0.1s; }
         .round-btn:active { transform: scale(0.92); }
         #btn-rec { background: #ff0000; color: white; }
         .txt-vert-fluo { color: #39ff14; text-shadow: 0 0 8px #39ff14; }
+        
+        /* Icône de Pause */
         .pause-icon { display: none; width: 22px; height: 26px; justify-content: space-between; }
         .pause-bar { width: 8px; height: 100%; background: #ffa500; border-radius: 2px; }
         .clignote-orange .pause-bar { animation: blinkOrange 1s infinite; }
         @keyframes blinkOrange { 50% { background: #ff4500; } }
+        
+        /* Bouton Reset Fléché */
         .btn-reset { width: 60px; height: 60px; border-radius: 50%; background: #222; border: 4px solid #666; display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .btn-reset.actif { border-color: #39ff14; background: #111; }
         .btn-reset svg { width: 26px; height: 26px; fill: #666; transition: 0.2s; }
@@ -48,7 +58,8 @@
             </div>
         </div>
     </div>
-    <script>
+<script>
+
         const VERSION_APP = "V6.2";
         const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbwtYmHKl6Nqy2nSqRedR7oilB8DznzlKcwbnbsaUUNIfxDAoRAofa55wbOWFv8HUX-y/exec";
 
@@ -104,6 +115,12 @@
                     blocDonneesSession.push({ index: indexPoint, x: curX, y: curY, z: curZ, alpha: curA, beta: curB, gamma: curG });
                     indexPoint++;
                     localStorage.setItem("dernier_index_virtuel", indexPoint);
+                    
+                    // 🔥 SECURITE TAMPON : Dès qu'on atteint 30 lignes (1 seconde), on détache et on envoie
+                    if (blocDonneesSession.length >= 30) {
+                        envoyerFichierBlocComplet(blocDonneesSession);
+                        blocDonneesSession = []; // Vide le tampon immédiat
+                    }
                     rafraichirVisuel();
                 }, 33.3);
             } else if (etatCourant === "RECORDING") {
@@ -111,7 +128,13 @@
                 clearInterval(intervalId); 
                 labelRec.style.display = "none"; iconPause.style.display = "flex";
                 btnRec.className = "round-btn clignote-orange";
-                envoyerFichierBlocComplet(blocDonneesSession);
+                
+                // Envoi du reliquat restant en fin de prise
+                if (blocDonneesSession.length > 0) {
+                    envoyerFichierBlocComplet(blocDonneesSession);
+                    blocDonneesSession = [];
+                }
+                statusText.innerText = "Status : Session sauvegardée !";
                 if (resetActif) { 
                     indexPoint = 1; localStorage.setItem("dernier_index_virtuel", 1);
                     resetActif = false; btnReset.classList.remove('actif');
@@ -126,17 +149,17 @@
                 "<strong>LIGNE INTERNE :</strong> " + ligneCible + " <br>" +
                 "<strong>ACCEL X:</strong> " + curX.toFixed(1) + " | Y: " + curY.toFixed(1) + " | Z: " + curZ.toFixed(1) + " <br>" +
                 "<strong>ROTATION A:</strong> " + curA.toFixed(0) + "° | B: " + curB.toFixed(0) + "° <br>" +
-                "<strong>STOCK CONSERVE :</strong> " + blocDonneesSession.length + " pts";
+                "<strong>TAMPON REQUIS :</strong> " + blocDonneesSession.length + " / 30 pts";
         }
 
         function envoyerFichierBlocComplet(listePoints) {
             if (listePoints.length === 0) return;
-            statusText.innerText = "Status : ⚡ Envoi du bloc...";
+            statusText.innerText = "Status : Envoi séquentiel...";
             let formData = new FormData();
             formData.append("donneesBloc", JSON.stringify({ points: listePoints }));
             fetch(URL_GOOGLE_SCRIPT, { method: "POST", mode: "no-cors", body: formData })
-            .then(() => { statusText.innerText = "Status : ✓ Bloc transmis !"; })
-            .catch(err => { console.error(err); statusText.innerText = "Status : ⚠️ Erreur réseau"; });
+            .then(() => { statusText.innerText = "Status : Flux synchronisé ✓"; })
+            .catch(err => { console.error(err); statusText.innerText = "Status : Micro-coupure ⚠️"; });
         }
     </script>
 </body>
