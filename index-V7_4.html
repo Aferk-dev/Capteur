@@ -30,7 +30,19 @@
         @keyframes blinkOrange { 50% { background: #ff4500; } }
         #btn-stop { background: linear-gradient(135deg, #777, #333); border-color: #bbb; }
         .stop-core { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #d9534f, #c9302c); display: flex; align-items: center; justify-content: center; border: 2px solid #fff; font-size: 10px; }
-        #status-text { font-weight: bold; color: #ffca28; }
+        #status-text { font-weight: bold; color: #ffca28; margin-top: 3px; }
+
+        /* 🌟 À INSÉRER ICI : Style pour griser le bouton REC pendant la purge */
+        .btn-verrouille {
+            background: #555555 !important;
+            border-color: #888888 !important;
+            color: #888888 !important;
+            cursor: not-allowed !important;
+            animation: pulseGris 1s infinite;
+        }
+        @keyframes pulseGris {
+            50% { opacity: 0.6; }
+        }
 
         /* 🌟 REDRESSAGE ULTRA-COMPACT POUR LE SAMSUNG HORIZONTAL */
         @media (orientation: landscape) {
@@ -68,7 +80,7 @@
 <script>
 	// Bloc n°3
     const VERSION_APP = "V7.4";
-    const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbzZ9auABiFHZ6cbxhVg7YdmfUGQ5bdaGcr8uEdSmZxGgNmuK-ORBZly7YfVaUiHgsM/exec";
+    const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbxo6d3hQLQtZlXDS6BmarI7VpqKAUhofj90ZZnW2g3YpGAcjdP2ajP1gsI6lxBxUto/exec";
     let etatCourant = "STOPPED", intervalId = null, resetActif = false; 
     let indexPoint = 1; 
     let curX = 0, curY = 0, curZ = 0, curA = 0, curB = 0, curG = 0, blocDonneesSession = [];
@@ -79,40 +91,24 @@
     const liveDataDisplay = document.getElementById('live-data'), statusText = document.getElementById('status-text');
     document.getElementById('title-version').innerText = "Data (30Hz) - " + VERSION_APP + " :";
 
-    // 🌟 REQUÊTE DE SYNCHRONISATION AU DÉMARRAGE
+    // Synchronisation au chargement de la page
     statusText.innerText = "Status : Synchro tableur...";
     fetch(URL_GOOGLE_SCRIPT)
         .then(res => res.json())
-        .then(data => {
-            indexPoint = data.prochain_index;
-            statusText.innerText = "Status : Prêt";
-            rafraichirVisuel();
-        })
-        .catch(err => {
-            let memoire = localStorage.getItem("dernier_index_virtuel");
-            indexPoint = memoire ? parseInt(memoire) : 1;
-            statusText.innerText = "Status : Prêt (Secours)";
-            rafraichirVisuel();
-        });
+        .then(data => { indexPoint = data.prochain_index; statusText.innerText = "Status : Prêt"; rafraichirVisuel(); })
+        .catch(err => { let memoire = localStorage.getItem("dernier_index_virtuel"); indexPoint = memoire ? parseInt(memoire) : 1; statusText.innerText = "Status : Prêt (Secours)"; rafraichirVisuel(); });
 
     async function demarrerCameraVideo() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
-            video.srcObject = stream;
-        } catch (err) { console.error("Erreur caméra : " + err.message); }
+        try { const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false }); video.srcObject = stream; } 
+        catch (err) { console.error("Erreur caméra : " + err.message); }
     }
     demarrerCameraVideo();
 
-    window.addEventListener('devicemotion', (e) => {
-        const acc = e.accelerationIncludingGravity;
-        if (acc) { curX = acc.x || 0; curY = acc.y || 0; curZ = acc.z || 0; rafraichirVisuel(); }
-    });
-    window.addEventListener('deviceorientation', (e) => {
-        curA = e.alpha || 0; curB = e.beta || 0; curG = e.gamma || 0; rafraichirVisuel();
-    });
+    window.addEventListener('devicemotion', (e) => { const acc = e.accelerationIncludingGravity; if (acc) { curX = acc.x || 0; curY = acc.y || 0; curZ = acc.z || 0; rafraichirVisuel(); } });
+    window.addEventListener('deviceorientation', (e) => { curA = e.alpha || 0; curB = e.beta || 0; curG = e.gamma || 0; rafraichirVisuel(); });
 
     btnReset.addEventListener('click', () => {
-        if (etatCourant === "RECORDING") return; // Protection : Interdit de reset en plein enregistrement
+        if (etatCourant === "RECORDING") return;
         resetActif = !resetActif;
         resetActif ? btnReset.classList.add('actif') : btnReset.classList.remove('actif');
         rafraichirVisuel();
@@ -120,63 +116,69 @@
 
     btnRec.addEventListener('click', () => {
         if (etatCourant === "STOPPED" || etatCourant === "PAUSED") {
-            // 🌟 NETTOYAGE DE SÉCURITÉ : On s'assure qu'aucun ancien chrono ne tourne en tâche de fond
             if (intervalId !== null) { clearInterval(intervalId); intervalId = null; }
             
-            if (resetActif) { 
-                indexPoint = 1; 
-                blocDonneesSession = []; 
-                resetActif = false; 
-                btnReset.classList.remove('actif');
+            // 🌟 LOGIQUE SÉCURISÉE : Si le bouton RESET est vert, on suspend le lancement du chrono
+            if (resetActif) {
+                statusText.innerText = "Status : Purge Google Sheets en cours...";
+                btnRec.style.pointerEvents = "none"; // Bloque le bouton pendant le traitement
                 
-                // 🌟 ENVOI DE L'ORDRE DE PURGE IMMÉDIAT À GOOGLE
-                statusText.innerText = "Status : Purge du tableur...";
                 let formDataReset = new FormData();
                 formDataReset.append("action", "RESET");
+                
                 fetch(URL_GOOGLE_SCRIPT, { method: "POST", body: formDataReset })
-                    .then(() => { statusText.innerText = "Status : Tableur vidé ✓"; });
+                    .then(res => res.json())
+                    .then(data => {
+                        // Uniquement quand Google confirme la purge, on réinitialise à 1 de force partout
+                        indexPoint = 1;
+                        localStorage.setItem("dernier_index_virtuel", 1);
+                        blocDonneesSession = [];
+                        resetActif = false;
+                        btnReset.classList.remove('actif');
+                        btnRec.style.pointerEvents = "auto"; // Libère le bouton
+                        
+                        // Lancement effectif sécurisé du flux à 1
+                        demarrerCaptureFlux();
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        statusText.innerText = "Status : Échec Purge Réseau ⚠";
+                        btnRec.style.pointerEvents = "auto";
+                    });
             } else {
+                // Si pas de reset, chargement classique continu
                 let memoireIndex = localStorage.getItem("dernier_index_virtuel");
                 indexPoint = memoireIndex ? parseInt(memoireIndex) : 1;
+                blocDonneesSession = [];
+                demarrerCaptureFlux();
             }
-            
-            localStorage.setItem("dernier_index_virtuel", indexPoint);
-            blocDonneesSession = []; // On vide impérativement le tampon avant de démarrer
-            etatCourant = "RECORDING"; statusText.innerText = "Status : Capture active...";
-            labelRec.style.display = "block"; iconPause.style.display = "none";
-            labelRec.className = "txt-vert-fluo"; btnRec.className = "round-btn"; 
-
-            intervalId = setInterval(() => {
-                let orient = (screen.orientation && screen.orientation.type.includes("landscape")) ? "LANDSCAPE" : "PORTRAIT";
-                
-                blocDonneesSession.push({ index: indexPoint, x: curX, y: curY, z: curZ, alpha: curA, beta: curB, gamma: curG, mode: orient });
-                
-                indexPoint++; 
-                localStorage.setItem("dernier_index_virtuel", indexPoint);
-                
-                if (blocDonneesSession.length >= 30) {
-                    envoyerFichierBlocComplet(blocDonneesSession, "CONTINUE"); 
-                    blocDonneesSession = []; 
-                }
-                rafraichirVisuel();
-            }, 33.3);
         } else if (etatCourant === "RECORDING") {
-            etatCourant = "PAUSED"; 
-            // 🌟 ARRÊT TOTAL ET STRICT DU CHRONOMÈTRE
-            clearInterval(intervalId); 
-            intervalId = null; 
-            
-            labelRec.style.display = "none"; iconPause.style.display = "flex";
-            btnRec.className = "round-btn clignote-orange";
-            
-            if (blocDonneesSession.length > 0) {
-                envoyerFichierBlocComplet(blocDonneesSession, "CONTINUE"); 
-                blocDonneesSession = []; // Vidage immédiat pour éviter l'accumulation fantôme
-            }
-            statusText.innerText = "Status : Session en pause"; 
-            rafraichirVisuel();
+            etatCourant = "PAUSED"; clearInterval(intervalId); intervalId = null; 
+            labelRec.style.display = "none"; iconPause.style.display = "flex"; btnRec.className = "round-btn clignote-orange";
+            if (blocDonneesSession.length > 0) { envoyerFichierBlocComplet(blocDonneesSession, "CONTINUE"); blocDonneesSession = []; }
+            statusText.innerText = "Status : Session en pause"; rafraichirVisuel();
         }
     });
+
+    // 🌟 FONCTION AUXILIAIRE : Déclenche le chronomètre proprement
+	function demarrerCaptureFlux() {
+		etatCourant = "RECORDING"; statusText.innerText = "Status : Capture active...";
+		labelRec.style.display = "block"; iconPause.style.display = "none";
+		labelRec.className = "txt-vert-fluo"; btnRec.className = "round-btn"; 
+
+		intervalId = setInterval(() => {
+			let orient = (screen.orientation && screen.orientation.type.includes("landscape")) ? "LANDSCAPE" : "PORTRAIT";
+			blocDonneesSession.push({ index: indexPoint, x: curX, y: curY, z: curZ, alpha: curA, beta: curB, gamma: curG, mode: orient });
+			indexPoint++;
+			localStorage.setItem("dernier_index_virtuel", indexPoint);
+			
+			if (blocDonneesSession.length >= 30) {
+				envoyerFichierBlocComplet(blocDonneesSession, "CONTINUE"); 
+				blocDonneesSession = []; 
+			}
+			rafraichirVisuel();
+		}, 33.3);
+	} 
 
 	// Bloc n°4
     btnStop.addEventListener('click', () => {
