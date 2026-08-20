@@ -115,46 +115,53 @@
     });
 
     // 🌟 LE CODE CORRIGÉ ET SÉCURISÉ POUR LE BOUTON REC
+    // 🌟 LOGIQUE DE PURGE SÉCURISÉE AVEC VERROU VISUEL IMMÉDIAT À 1
     btnRec.addEventListener('click', () => {
         if (etatCourant === "STOPPED" || etatCourant === "PAUSED") {
             if (intervalId !== null) { clearInterval(intervalId); intervalId = null; }
             
-            // 🟢 CAS N°1 : LE BOUTON DE RÉINITIALISATION EST VERT (ACTIF) -> ON PURGE
+            // 🟢 CAS N°1 : BOUTON VERT ACTIF -> PURGE BLOQUANTE ET INTERFACES NETTOYÉES À 1
             if (resetActif === true) {
                 statusText.innerText = "Status : Purge Google Sheets en cours...";
                 
-                // Effet visuel d'attente
+                // 1. ÉCRASEMENT VISUEL ET MÉMOIRE IMMÉDIAT (Avant le réseau !)
+                indexPoint = 1; 
+                localStorage.setItem("dernier_index_virtuel", 1);
+                blocDonneesSession = [];
+                resetActif = false;
+                btnReset.classList.remove('actif');
+                
+                // 2. BLOCAGE ERGONOMIQUE DU BOUTON
                 btnRec.style.background = "#555555";
                 btnRec.style.borderColor = "#888888";
                 btnRec.style.opacity = "0.6";
                 btnRec.style.pointerEvents = "none"; 
                 labelRec.innerText = "WAIT"; 
                 
+                rafraichirVisuel(); // Force l'écran à afficher instantanément LIGNE INTERNE : 1
+
+                // 3. ENVOI DE LA PURGE ET ATTENTE DU GO DE GOOGLE
                 let formDataReset = new FormData();
                 formDataReset.append("action", "RESET");
                 
                 fetch(URL_GOOGLE_SCRIPT, { method: "POST", body: formDataReset })
-                    .then(res => res.json())
+                    .then(res => res.json()) // On attend un vrai JSON de confirmation
                     .then(data => {
-                        indexPoint = 1;
-                        localStorage.setItem("dernier_index_virtuel", 1);
-                        blocDonneesSession = [];
-                        resetActif = false;
-                        btnReset.classList.remove('actif');
-                        
-                        // Restauration du bouton REC
+                        // Google confirme que le tableau est vide ! On libère le bouton REC
                         btnRec.style.background = "#ff0000";
                         btnRec.style.borderColor = "white";
                         btnRec.style.opacity = "1";
                         btnRec.style.pointerEvents = "auto";
                         labelRec.innerText = "REC";
                         
-                        // Départ forcé à 1
+                        // Lancement officiel du flux, verrouillé à 1
                         demarrerCaptureFlux(1);
                     })
                     .catch(err => {
                         console.error(err);
                         statusText.innerText = "Status : Échec Purge Réseau ⚠";
+                        
+                        // En cas d'échec réel, on libère le bouton mais on maintient la sécurité à 1
                         btnRec.style.background = "#ff0000";
                         btnRec.style.borderColor = "white";
                         btnRec.style.opacity = "1";
@@ -162,31 +169,18 @@
                         labelRec.innerText = "REC";
                     });
             } 
-            // ⚪ CAS N°2 : LE BOUTON DE RÉINITIALISATION EST GRISÉ (ÉTEINT) -> REPRISE EN CONTINUITÉ
+            // ⚪ CAS N°2 : REPRISE EN CONTINUITÉ CLASSIQUE
             else {
-                // 🌟 CORRECTION DE SÉCURITÉ : On ne va plus chercher le localStorage au clic !
-                // On démarre directement avec la valeur 'indexPoint' actuelle (qui vaut soit 1 si purgé, soit la vraie suite)
                 blocDonneesSession = [];
-                
-                // On lance le flux à la suite exacte affichée à l'écran
                 demarrerCaptureFlux(indexPoint);
             }
             
         } else if (etatCourant === "RECORDING") {
-            // Logique de mise en pause (votre code d'origine ultra-propre)
-            etatCourant = "PAUSED"; 
-            clearInterval(intervalId); 
-            intervalId = null; 
-            
-            labelRec.style.display = "none"; iconPause.style.display = "flex";
-            btnRec.className = "round-btn clignote-orange";
-            
-            if (blocDonneesSession.length > 0) {
-                envoyerFichierBlocComplet(blocDonneesSession, "CONTINUE"); 
-                blocDonneesSession = []; 
-            }
-            statusText.innerText = "Status : Session en pause"; 
-            rafraichirVisuel();
+            // Mise en pause standard
+            etatCourant = "PAUSED"; clearInterval(intervalId); intervalId = null; 
+            labelRec.style.display = "none"; iconPause.style.display = "flex"; btnRec.className = "round-btn clignote-orange";
+            if (blocDonneesSession.length > 0) { envoyerFichierBlocComplet(blocDonneesSession, "CONTINUE"); blocDonneesSession = []; }
+            statusText.innerText = "Status : Session en pause"; rafraichirVisuel();
         }
     });
 
