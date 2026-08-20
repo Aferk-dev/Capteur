@@ -68,9 +68,9 @@
 <script>
 	// Bloc n°3
     const VERSION_APP = "V7.4";
-    const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbzYzAUmSClZKWraRq66Id7sX7F4tbH752qS7-YIGD4W0Q68COwfAVh4Ry0EUI-O0AMl/exec";
+    const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbys-AcdAc1UtQx-yvLXusq7MXWSAtv7f2L20Hy6p2dqATbUYxr7DP3bmKBBRWdqBxBa/exec";
     let etatCourant = "STOPPED", intervalId = null, resetActif = false; 
-    let indexPoint = localStorage.getItem("dernier_index_virtuel") ? parseInt(localStorage.getItem("dernier_index_virtuel")) : 1;
+    let indexPoint = 1; 
     let curX = 0, curY = 0, curZ = 0, curA = 0, curB = 0, curG = 0, blocDonneesSession = [];
 
     const video = document.getElementById('video-preview'), btnRec = document.getElementById('btn-rec');
@@ -78,6 +78,22 @@
     const btnReset = document.getElementById('btn-reset'), btnStop = document.getElementById('btn-stop');
     const liveDataDisplay = document.getElementById('live-data'), statusText = document.getElementById('status-text');
     document.getElementById('title-version').innerText = "Data (30Hz) - " + VERSION_APP + " :";
+
+    // 🌟 REQUÊTE DE SYNCHRONISATION AU DÉMARRAGE
+    statusText.innerText = "Status : Synchro tableur...";
+    fetch(URL_GOOGLE_SCRIPT)
+        .then(res => res.json())
+        .then(data => {
+            indexPoint = data.prochain_index;
+            statusText.innerText = "Status : Prêt";
+            rafraichirVisuel();
+        })
+        .catch(err => {
+            let memoire = localStorage.getItem("dernier_index_virtuel");
+            indexPoint = memoire ? parseInt(memoire) : 1;
+            statusText.innerText = "Status : Prêt (Secours)";
+            rafraichirVisuel();
+        });
 
     async function demarrerCameraVideo() {
         try {
