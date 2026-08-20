@@ -3,27 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Moniteur Virtual Cam Pro - Studio</title>
+    <title>Moniteur Virtual Cam Pro - Fix</title>
     <style>
         * { box-sizing: border-box; }
         body { font-family: -apple-system, sans-serif; margin: 0; padding: 0; background: #5b9bd5; height: 100vh; overflow: hidden; color: white; }
         
-        /* Conteneur principal divisé en deux (Design côte à côte) */
+        /* Conteneur principal divisé en deux (Design côte à côte de votre schéma) */
         .main-container { display: flex; width: 100vw; height: 100vh; padding: 15px; gap: 15px; }
         
-        /* CÔTÉ GAUCHE : Zone Caméra dédiée (Bords arrondis, pas de superposition) */
-        .video-zone { flex: 1.3; background: #000; border-radius: 40px; border: 3px solid #1f4e79; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-        #video-preview { width: 100%; height: 100%; object-fit: cover; }
+        /* CÔTÉ GAUCHE : Zone Caméra dédiée */
+        .video-zone { flex: 1.3; background: #000; border-radius: 40px; border: 3px solid #1f4e79; overflow: hidden; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        #video-preview { width: 100%; height: 100%; object-fit: cover; display: block; }
         
         /* CÔTÉ DROIT : Panneau de contrôle dédié */
         .control-zone { flex: 0.7; display: flex; flex-direction: column; justify-content: space-between; padding: 5px 0; }
         
-        /* Boîtier de texte des données (Noir opaque semi-brillant) */
+        /* Boîtier de texte des données */
         .data-box { background: rgba(0, 0, 0, 0.85); border: 2px solid #aaa; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; line-height: 1.5; text-align: left; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
         .data-box-title { border-bottom: 1px solid #555; padding-bottom: 6px; margin-bottom: 8px; font-weight: bold; color: #ddd; }
         
         /* Zone des boutons de commande en bas */
-        .buttons-zone { display: flex; justify-content: center; align-items: center; gap: 40px; margin-bottom: 20px; }
+        .buttons-zone { display: flex; justify-content: center; align-items: center; gap: 40px; margin-bottom: 20px; pointer-events: auto; }
         
         /* Style des boutons circulaires */
         .round-btn { position: relative; width: 75px; height: 75px; border-radius: 50%; border: 4px solid white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); transition: transform 0.1s, filter 0.2s; }
@@ -45,7 +45,6 @@
         .btn-reset:active { transform: scale(0.92); }
         .btn-reset svg { width: 30px; height: 30px; fill: #666; transition: 0.2s; }
         
-        /* État allumé Fluo du bouton Reset (Par défaut au début) */
         .btn-reset.actif { border-color: #39ff14; box-shadow: 0 0 12px #39ff14; background: #111; }
         .btn-reset.actif svg { fill: #39ff14; }
     </style>
@@ -81,7 +80,7 @@
                     </div>
                 </div>
                 
-                <!-- Bouton RESET circulaire (Icône flèche de rotation) -->
+                <!-- Bouton RESET circulaire -->
                 <div id="btn-reset" class="btn-reset actif" title="Réinitialiser au début">
                     <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
                 </div>
@@ -105,7 +104,7 @@
         const btnReset = document.getElementById('btn-reset');
         const liveDataDisplay = document.getElementById('live-data');
 
-        // Lancement de la caméra
+        // Lancement automatique de la caméra au chargement
         async function demarrerCameraVideo() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -113,12 +112,17 @@
                     audio: false
                 });
                 video.srcObject = stream;
+                // Force l'allumage physique de la vidéo sur Android
+                await video.play(); 
             } catch (err) {
-                console.error("Erreur caméra : " + err.message);
+                console.error("Erreur d'allumage caméra : " + err.message);
             }
         }
+        
+        // 🔥 Lancement immédiat au chargement du fichier
+        demarrerCameraVideo();
 
-        // Capteurs matériels
+        // Écouteurs des capteurs
         window.addEventListener('devicemotion', (e) => {
             const acc = e.accelerationIncludingGravity;
             if (acc) {
@@ -136,7 +140,7 @@
             rafraichirVisuel();
         });
 
-        // Logique du bouton interrupteur Reset (Vert)
+        // Logique du bouton Reset
         btnReset.addEventListener('click', () => {
             resetActif = !resetActif;
             if (resetActif) {
@@ -150,14 +154,9 @@
 
         // Logique de commande du bouton REC Principal
         btnRec.addEventListener('click', async () => {
-
-            //🔥 Demande au téléphone de masquer instantanément toutes les barres du navigateur
+            // Demande de plein écran lors du clic
             if (document.documentElement.requestFullscreen) {
                 document.documentElement.requestFullscreen().catch(err => console.log(err));
-            }
-
-            if (!video.srcObject) {
-                await demarrerCameraVideo();
             }
 
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
@@ -205,9 +204,3 @@
                 <strong>ACCEL :</strong> X: ${mesuresCourantes.x.toFixed(1)} | Y: ${mesuresCourantes.y.toFixed(1)} | Z: ${mesuresCourantes.z.toFixed(1)} <br>
                 <strong>ROTATION :</strong> A: ${mesuresCourantes.alpha.toFixed(0)}° | B: ${mesuresCourantes.beta.toFixed(0)}° | G: ${mesuresCourantes.gamma.toFixed(0)}°
             `;
-        }
-
-        function envoyerDonnees(donnees) {
-            fetch(URL_GOOGLE_SCRIPT, {
-                method: "POST",
-                mode: "no-cors",
