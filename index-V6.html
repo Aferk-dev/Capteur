@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Moniteur Virtual Cam Pro - V5 Stable Bloc</title>
+    <title>Moniteur Virtual Cam Pro - V6 Stable</title>
     <style>
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; background: #5b9bd5; font-family: -apple-system, sans-serif; min-height: 100vh; color: white; }
@@ -22,10 +22,17 @@
         .pause-bar { width: 8px; height: 100%; background: #ffa500; border-radius: 2px; }
         .clignote-orange .pause-bar { animation: blinkOrange 1s infinite; }
         @keyframes blinkOrange { 50% { background: #ff4500; } }
-        .btn-reset { width: 60px; height: 60px; border-radius: 50%; background: #222; border: 4px solid #666; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        .btn-reset.actif { border-color: #39ff14; background: #111; }
-        .btn-reset svg { width: 26px; height: 26px; fill: #666; }
+        
+        /* Bouton RESET */
+        .btn-reset { width: 60px; height: 60px; border-radius: 50%; background: #222; border: 4px solid #666; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.4); transition: transform 0.1s; }
+        .btn-reset:active { transform: scale(0.92); }
+        .btn-reset svg { width: 26px; height: 26px; fill: #666; transition: 0.2s; }
+        
+        /* Style allumé actif Fluo */
+        .btn-reset.actif { border-color: #39ff14; box-shadow: 0 0 12px #39ff14; background: #111; }
         .btn-reset.actif svg { fill: #39ff14; }
+        
+        #status-text { font-weight: bold; color: #ffca28; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -37,12 +44,14 @@
 
         <div class="control-zone">
             <div class="data-box">
-                <div class="data-box-title">Données de session (30Hz) :</div>
+                <!-- 🔥 La balise de titre qui va accueillir le numéro de version dynamique -->
+                <div id="title-version" class="data-box-title">Données de session (30Hz) :</div>
                 <div id="live-data">
-                    LIGNE CIBLE : 1 <br>
-                    ACCEL X: 0.0 | Y: 0.0 | Z: 0.0<br>
-                    ROTATION A: 0° | B: 0° | G: 0°
+                    LIGNE INTERNE : 1 <br>
+                    ACCEL : X: 0.0 | Y: 0.0 <br>
+                    STOCK CONSERVE : 0 pts
                 </div>
+                <div id="status-text">Statut : Caméra prête</div>
             </div>
 
             <div class="buttons-zone">
@@ -50,7 +59,8 @@
                     <span id="label-rec">REC</span>
                     <div id="icon-pause" class="pause-icon"><div class="pause-bar"></div><div class="pause-bar"></div></div>
                 </div>
-                <div id="btn-reset" class="btn-reset actif">
+                <!-- 🔥 Retrait de la classe 'actif' pour qu'il soit grisé par défaut au démarrage -->
+                <div id="btn-reset" class="btn-reset" title="Réinitialiser au début (Écraser)">
                     <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
                 </div>
             </div>
@@ -58,16 +68,18 @@
     </div>
 
     <script>
-        // ⚠️ REMETTEZ VOTRE LIEN GOOGLE SCRIPT INTERMÉDIAIRE ICI (LIGNE 74)
-        const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbzoQZhYDAeXb6SsGmXopDWauElMtGnLfx-9O9RwqhkexVjMez_R7pDKVmBvrVD048zK/exec";
+        // 🌟 CONFIGURATION DES VARIABLES PRINCIPALES
+        const VERSION_APP = "V6"; // Modifiez simplement cette ligne pour changer de version à l'écran
+        const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbwtYmHKl6Nqy2nSqRedR7oilB8DznzlKcwbnbsaUUNIfxDAoRAofa55wbOWFv8HUX-y/exec";
 
         let etatCourant = "STOPPED"; 
         let intervalId = null;
         let indexPoint = 1;
-        let resetActif = true; 
-        let mesuresCourantes = { x: 0, y: 0, z: 0, alpha: 0, beta: 0, gamma: 0 };
         
-        // 🔥 LE TABLEAU DE STOCKAGE LOCAL DU TÉLÉPHONE
+        // 🔥 Changement de logique : désactivé (false) par défaut au démarrage
+        let resetActif = false; 
+        
+        let mesuresCourantes = { x: 0, y: 0, z: 0, alpha: 0, beta: 0, gamma: 0 };
         let blocDonneesSession = [];
 
         const video = document.getElementById('video-preview');
@@ -76,6 +88,11 @@
         const iconPause = document.getElementById('icon-pause');
         const btnReset = document.getElementById('btn-reset');
         const liveDataDisplay = document.getElementById('live-data');
+        const statusText = document.getElementById('status-text');
+        const titleVersion = document.getElementById('title-version');
+
+        // Affichage dynamique du titre avec la version
+        titleVersion.innerText = `Données de session (30Hz) - ${VERSION_APP} :`;
 
         async function demarrerCameraVideo() {
             try {
@@ -85,7 +102,7 @@
                 });
                 video.srcObject = stream;
             } catch (err) {
-                console.error("Erreur caméra : " + err.message);
+                statusText.innerText = "⚠️ Erreur caméra : " + err.message;
             }
         }
         
@@ -114,7 +131,7 @@
                 btnReset.classList.add('actif'); 
                 if (etatCourant === "PAUSED" || etatCourant === "STOPPED") { 
                     indexPoint = 1; 
-                    blocDonneesSession = []; // Vide le stockage local
+                    blocDonneesSession = []; 
                 } 
             } else { 
                 btnReset.classList.remove('actif'); 
@@ -129,15 +146,14 @@
                     blocDonneesSession = []; 
                 }
                 etatCourant = "RECORDING";
+                statusText.innerText = "Status : Capture active...";
                 
                 labelRec.style.display = "block";
                 iconPause.style.display = "none";
                 labelRec.className = "txt-vert-fluo";
                 btnRec.className = "round-btn"; 
 
-                // ⏱️ BOUCLE DE MESURE LOCAL DIRECTE A 30Hz
                 intervalId = setInterval(() => {
-                    // On enregistre localement dans la mémoire vive du téléphone
                     blocDonneesSession.push({
                         index: indexPoint,
                         x: mesuresCourantes.x,
@@ -152,7 +168,6 @@
                 }, 33.3);
 
             } else if (etatCourant === "RECORDING") {
-                // PASSAGE EN PAUSE : ON ENVOIE ENFIN LE BLOC UNIQUE
                 etatCourant = "PAUSED";
                 clearInterval(intervalId); 
 
@@ -160,7 +175,7 @@
                 iconPause.style.display = "flex";
                 btnRec.className = "round-btn clignote-orange";
                 
-                // 🔥 ENVOI GÉANT MAIS UNIQUE VERS GOOGLE DRIVE
+                // Envoi automatique du paquet accumulé
                 envoyerFichierBlocComplet(blocDonneesSession);
                 
                 if (resetActif) { 
@@ -182,25 +197,7 @@
         function envoyerFichierBlocComplet(listePoints) {
             if (listePoints.length === 0) return;
             
-            // On prévient l'interface
-            document.getElementById('status-text').innerText = "⚡ Synchronisation en cours...";
+            statusText.innerText = "Status : ⚡ Envoi du bloc...";
             
-            // 🔥 METHODE ULTRA-COMPATIBLE : Envoi sous forme de formulaire texte
             let formData = new FormData();
             formData.append("donneesBloc", JSON.stringify({ points: listePoints }));
-            
-            fetch(URL_GOOGLE_SCRIPT, {
-                method: "POST",
-                body: formData
-            })
-            .then(() => {
-                document.getElementById('status-text').innerText = "✓ Données envoyées !";
-            })
-            .catch(err => {
-                console.error(err);
-                document.getElementById('status-text').innerText = "⚠️ Erreur réseau";
-            });
-        }
-    </script>
-</body>
-</html>
