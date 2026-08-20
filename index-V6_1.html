@@ -186,12 +186,13 @@
 
         function rafraichirVisuel() {
             let ligneCible = (resetActif && etatCourant === "STOPPED") ? 1 : indexPoint;
-            liveDataDisplay.innerHTML = `
-                <strong>LIGNE INTERNE :</strong> ${ligneCible} <br>
-                <strong>ACCEL X:</strong> ${curX.toFixed(1)} | Y: ${curY.toFixed(1)} | Z: ${curZ.toFixed(1)} <br>
-                <strong>ROTATION A:</strong> ${curA.toFixed(0)}° | B: ${curB.toFixed(0)}° <br>
-                <strong>STOCK CONSERVE :</strong> ${blocDonneesSession.length} pts
-            `;
+            
+            // 🔥 Version nettoyée de tout accent grave pour débloquer Android
+            liveDataDisplay.innerHTML = 
+                "<strong>LIGNE INTERNE :</strong> " + ligneCible + " <br>" +
+                "<strong>ACCEL X:</strong> " + curX.toFixed(1) + " | Y: " + curY.toFixed(1) + " | Z: " + curZ.toFixed(1) + " <br>" +
+                "<strong>ROTATION A:</strong> " + curA.toFixed(0) + "° | B: " + curB.toFixed(0) + "° <br>" +
+                "<strong>STOCK CONSERVE :</strong> " + blocDonneesSession.length + " pts";
         }
 
         function envoyerFichierBlocComplet(listePoints) {
