@@ -207,18 +207,6 @@
                 method: "POST",
                 mode: "no-cors",
                 body: formData
-        function envoyerFichierBlocComplet(listePoints) {
-            if (listePoints.length === 0) return;
-            
-            statusText.innerText = "Status : ⚡ Envoi du bloc...";
-            
-            let formData = new FormData();
-            formData.append("donneesBloc", JSON.stringify({ points: listePoints }));
-            
-            fetch(URL_GOOGLE_SCRIPT, {
-                method: "POST",
-                mode: "no-cors",
-                body: formData
             })
             .catch(err => {
                 console.error(err);
