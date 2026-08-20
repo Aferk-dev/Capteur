@@ -66,6 +66,7 @@
         </div>
     </div>
 <script>
+	// Bloc n°3
     const VERSION_APP = "V7.4";
     const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbzYzAUmSClZKWraRq66Id7sX7F4tbH752qS7-YIGD4W0Q68COwfAVh4Ry0EUI-O0AMl/exec";
     let etatCourant = "STOPPED", intervalId = null, resetActif = false; 
@@ -95,7 +96,7 @@
     });
 
     btnReset.addEventListener('click', () => {
-        if (etatCourant === "RECORDING") return; // Interdit de reset pendant qu'on filme
+        if (etatCourant === "RECORDING") return; // Protection : Interdit de reset en plein enregistrement
         resetActif = !resetActif;
         resetActif ? btnReset.classList.add('actif') : btnReset.classList.remove('actif');
         rafraichirVisuel();
@@ -103,7 +104,9 @@
 
     btnRec.addEventListener('click', () => {
         if (etatCourant === "STOPPED" || etatCourant === "PAUSED") {
-            // 🌟 SÉCURITÉ DE L'INDEX : On verrouille le point de départ exact
+            // 🌟 NETTOYAGE DE SÉCURITÉ : On s'assure qu'aucun ancien chrono ne tourne en tâche de fond
+            if (intervalId !== null) { clearInterval(intervalId); intervalId = null; }
+            
             if (resetActif) { 
                 indexPoint = 1; 
                 blocDonneesSession = []; 
@@ -115,6 +118,7 @@
             }
             
             localStorage.setItem("dernier_index_virtuel", indexPoint);
+            blocDonneesSession = []; // On vide impérativement le tampon avant de démarrer
             etatCourant = "RECORDING"; statusText.innerText = "Status : Capture active...";
             labelRec.style.display = "block"; iconPause.style.display = "none";
             labelRec.className = "txt-vert-fluo"; btnRec.className = "round-btn"; 
@@ -124,7 +128,7 @@
                 
                 blocDonneesSession.push({ index: indexPoint, x: curX, y: curY, z: curZ, alpha: curA, beta: curB, gamma: curG, mode: orient });
                 
-                indexPoint++; // Incrémentation propre ligne par ligne à la milliseconde
+                indexPoint++; 
                 localStorage.setItem("dernier_index_virtuel", indexPoint);
                 
                 if (blocDonneesSession.length >= 30) {
@@ -135,18 +139,22 @@
             }, 33.3);
         } else if (etatCourant === "RECORDING") {
             etatCourant = "PAUSED"; 
+            // 🌟 ARRÊT TOTAL ET STRICT DU CHRONOMÈTRE
             clearInterval(intervalId); 
+            intervalId = null; 
+            
             labelRec.style.display = "none"; iconPause.style.display = "flex";
             btnRec.className = "round-btn clignote-orange";
             
             if (blocDonneesSession.length > 0) {
                 envoyerFichierBlocComplet(blocDonneesSession, "CONTINUE"); 
-                blocDonneesSession = [];
+                blocDonneesSession = []; // Vidage immédiat pour éviter l'accumulation fantôme
             }
-            statusText.innerText = "Status : En Pause"; 
+            statusText.innerText = "Status : Session en pause"; 
             rafraichirVisuel();
         }
     });
+
 	// Bloc n°4
     btnStop.addEventListener('click', () => {
         if (etatCourant === "RECORDING" || etatCourant === "PAUSED") {
