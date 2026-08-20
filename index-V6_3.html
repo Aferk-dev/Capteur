@@ -153,14 +153,18 @@
 			}
 		});
 
-        function rafraichirVisuel() {
-            let ligneCible = (resetActif && etatCourant === "STOPPED") ? 1 : indexPoint;
-            liveDataDisplay.innerHTML = 
-                "<strong>LIGNE INTERNE :</strong> " + ligneCible + " <br>" +
-                "<strong>ACCEL X:</strong> " + curX.toFixed(1) + " | Y: " + curY.toFixed(1) + " | Z: " + curZ.toFixed(1) + " <br>" +
-                "<strong>ROTATION A:</strong> " + curA.toFixed(0) + "° | B: " + curB.toFixed(0) + "° <br>" +
-                "<strong>TAMPON REQUIS :</strong> " + blocDonneesSession.length + " / 30 pts";
-        }
+		function rafraichirVisuel() {
+			let ligneCible = (resetActif && etatCourant === "STOPPED") ? 1 : indexPoint;
+			
+			// 🔥 CORRECTION : On affiche le nombre exact de points actuellement bloqués dans le téléphone
+			let pointsDansLeTampon = blocDonneesSession.length;
+
+			liveDataDisplay.innerHTML = 
+				"<strong>LIGNE INTERNE :</strong> " + ligneCible + "<br>" +
+				"ACCEL X: " + curX.toFixed(1) + " | Y: " + curY.toFixed(1) + " | Z: " + curZ.toFixed(1) + "<br>" +
+				"ROTATION A: " + Math.round(curA) + "° | B: " + Math.round(curB) + "° | G: " + Math.round(curG) + "°<br><br>" +
+				"<strong>TAMPON REQUIS :</strong> " + pointsDansLeTampon + " / 30 pts";
+		}
 
         function envoyerFichierBlocComplet(listePoints) {
             if (listePoints.length === 0) return;
