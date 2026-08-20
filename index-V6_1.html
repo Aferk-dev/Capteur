@@ -131,10 +131,16 @@
 
         btnRec.addEventListener('click', () => {
             if (etatCourant === "STOPPED" || etatCourant === "PAUSED") {
-                if (resetActif || etatCourant === "STOPPED") { 
+                
+                // 🔥 LOGIQUE SÉCURISÉE : On ne repasse à 1 QUE SI le bouton Reset vert est actif
+                // Sinon, 'indexPoint' conserve précieusement sa valeur précédente pour continuer à la suite !
+                if (resetActif) { 
                     indexPoint = 1; 
                 }
+                
+                // On nettoie le stockage temporaire pour la nouvelle session de capture
                 blocDonneesSession = [];
+                
                 etatCourant = "RECORDING";
                 statusText.innerText = "Status : Capture active...";
                 
@@ -165,10 +171,11 @@
                 iconPause.style.display = "flex";
                 btnRec.className = "round-btn clignote-orange";
                 
+                // Envoi immédiat du bloc en mémoire
                 envoyerFichierBlocComplet(blocDonneesSession);
                 
+                // Si le bouton vert était allumé, la réinitialisation a eu lieu, on l'éteint pour la suite
                 if (resetActif) { 
-                    indexPoint = 1;
                     resetActif = false;
                     btnReset.classList.remove('actif');
                 }
