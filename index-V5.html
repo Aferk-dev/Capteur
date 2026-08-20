@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Moniteur Virtual Cam Pro - Studio Fix</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; margin: 0; padding: 0; background: #5b9bd5; height: 100vh; overflow: hidden; color: white; }
+        
+        /* Conteneur principal horizontal côte à côte */
+        .main-container { display: flex; width: 100vw; height: 100vh; padding: 15px; gap: 15px; }
+        
+        /* CÔTÉ GAUCHE : Zone Caméra dédiée (Affiche 100% de l'image sans masque) */
+        .video-zone { flex: 1.3; background: #000; border-radius: 40px; border: 3px solid #1f4e79; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        #video-preview { width: 100%; height: 100%; object-fit: contain; background: #000; }
+        
+        /* CÔTÉ DROIT : Panneau de contrôle dédié */
+        .control-zone { flex: 0.7; display: flex; flex-direction: column; justify-content: space-between; padding: 5px 0; }
+        
+        /* Boîtier de texte des données */
+        .data-box { background: rgba(0, 0, 0, 0.85); border: 2px solid #aaa; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; line-height: 1.5; text-align: left; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .data-box-title { border-bottom: 1px solid #555; padding-bottom: 6px; margin-bottom: 8px; font-weight: bold; color: #ddd; }
+        
+        /* Zone des boutons de commande */
+        .buttons-zone { display: flex; justify-content: center; align-items: center; gap: 40px; margin-bottom: 20px; pointer-events: auto; }
+        
+        /* Style des boutons circulaires */
+        .round-btn { position: relative; width: 75px; height: 75px; border-radius: 50%; border: 4px solid white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); transition: transform 0.1s, filter 0.2s; }
+        .round-btn:active { transform: scale(0.92); }
+        
+        #btn-rec { background: #ff0000; color: white; }
+        .txt-vert-fluo { color: #39ff14; text-shadow: 0 0 8px #39ff14; }
+        
+        .pause-icon { display: none; width: 22px; height: 26px; justify-content: space-between; }
+        .pause-bar { width: 8px; height: 100%; background: #ffa500; border-radius: 2px; }
+        
+        .clignote-orange .pause-bar { animation: blinkOrange 1s infinite; }
+        @keyframes blinkOrange { 50% { background: #ff4500; box-shadow: 0 0 10px #ff4500; } }
+
+        .btn-reset { width: 65px; height: 65px; border-radius: 50%; background: #222; border: 4px solid #666; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
+        .btn-reset:active { transform: scale(0.92); }
+        .btn-reset svg { width: 30px; height: 30px; fill: #666; transition: 0.2s; }
+        
+        .btn-reset.actif { border-color: #39ff14; box-shadow: 0 0 12px #39ff14; background: #111; }
+        .btn-reset.actif svg { fill: #39ff14; }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <!-- CÔTÉ GAUCHE : TOUTE L'IMAGE SANS PERTE -->
+        <div class="video-zone">
+            <!-- Ajout des contraintes natives directement sur la balise -->
+            <video id="video-preview" autoplay playsinline muted></video>
+        </div>
+
+        <!-- CÔTÉ DROIT : LES DONNÉES ET LES BOUTONS -->
+        <div class="control-zone">
+            <div class="data-box">
+                <div class="data-box-title">Données vers Drive (30Hz) :</div>
+                <div id="live-data">
+                    LIGNE CIBLE : 1 <br>
+                    ACCEL X: 0.0 | Y: 0.0 | Z: 0.0<br>
+                    ROTATION A: 0° | B: 0° | G: 0°
+                </div>
+            </div>
+
+            <div class="buttons-zone">
+                <div id="btn-rec" class="round-btn">
+                    <span id="label-rec" class="txt-blanc">REC</span>
+                    <div id="icon-pause" class="pause-icon">
+                        <div class="pause-bar"></div>
+                        <div class="pause-bar"></div>
+                    </div>
+                </div>
+                
+                <div id="btn-reset" class="btn-reset actif" title="Réinitialiser au début">
+                    <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbw-lcalrUOemS1w3DgSnKKHNHrMHnn6QV-dyQs1Eix_Ih1gRSoLs4vzd8yY7usnGS7s/exec";
+
+        let etatCourant = "STOPPED"; 
+        let intervalId = null;
+        let indexPoint = 1;
+        let resetActif = true; 
+        let mesuresCourantes = { x: 0, y: 0, z: 0, alpha: 0, beta: 0, gamma: 0 };
+
+        const video = document.getElementById('video-preview');
+        const btnRec = document.getElementById('btn-rec');
+        const labelRec = document.getElementById('label-rec');
+        const iconPause = document.getElementById('icon-pause');
+        const btnReset = document.getElementById('btn-reset');
+        const liveDataDisplay = document.getElementById('live-data');
+
+        async function demarrerCameraVideo() {
+            try {
+                // Configuration stricte du flux matériel
+                const contraintes = {
+                    video: { 
+                        facingMode: { ideal: "environment" }
+                    },
+                    audio: false // Désactivation absolue du micro pour la sécurité Android
+                };
+                
+                const stream = await navigator.mediaDevices.getUserMedia(contraintes);
+                video.srcObject = stream;
+                
+                // 🔥 Sécurité Android : On force les paramètres audio coupés par programmation
+                video.setAttribute('playsinline', '');
+                video.setAttribute('muted', '');
+                video.muted = true;
+                
+                await video.play();
+            } catch (err) {
+                console.error("Erreur d'allumage : " + err.message);
+            }
+        }
+        
+        // Démarrage automatique au chargement
+        demarrerCameraVideo();
+
+        // Capteurs
+        window.addEventListener('devicemotion', (e) => {
+            const acc = e.accelerationIncludingGravity;
+            if (acc) {
+                mesuresCourantes.x = acc.x || 0;
+                mesuresCourantes.y = acc.y || 0;
+                mesuresCourantes.z = acc.z || 0;
+                rafraichirVisuel();
+            }
+        });
+
+        window.addEventListener('deviceorientation', (e) => {
+            mesuresCourantes.alpha = e.alpha || 0;
+            mesuresCourantes.beta = e.beta || 0;
+            mesuresCourantes.gamma = e.gamma || 0;
+            rafraichirVisuel();
+        });
+
+        btnReset.addEventListener('click', () => {
+            resetActif = !resetActif;
+            if (resetActif) {
+                btnReset.classList.add('actif');
+                if (etatCourant === "PAUSED" || etatCourant === "STOPPED") { indexPoint = 1; }
+            } else {
+                btnReset.classList.remove('actif');
+            }
+            rafraichirVisuel();
+        });
+
+        btnRec.addEventListener('click', async () => {
+            // Plein écran lors du clic
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(err => console.log(err));
+            }
+
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                if (etatCourant === "STOPPED") {
+                    try {
+                        const permission = await DeviceMotionEvent.requestPermission();
+                        if (permission !== 'granted') { return; }
+                    } catch (e) { console.error(e); }
+                }
+            }
+
+            if (etatCourant === "STOPPED" || etatCourant === "PAUSED") {
+                if (resetActif && etatCourant === "STOPPED") { indexPoint = 1; }
+                etatCourant = "RECORDING";
+                
+                labelRec.style.display = "block";
+                iconPause.style.display = "none";
+                labelRec.className = "txt-vert-fluo";
+                btnRec.className = "round-btn"; 
+
+                intervalId = setInterval(() => {
+                    const payload = { index: indexPoint, ...mesuresCourantes };
+                    envoyerDonnees(payload);
+                    indexPoint++;
+                    rafraichirVisuel();
+                }, 33.3);
+
+            } else if (etatCourant === "RECORDING") {
+                etatCourant = "PAUSED";
+                clearInterval(intervalId); 
+
+                if (resetActif) { indexPoint = 1; }
+
+                labelRec.style.display = "none";
+                iconPause.style.display = "flex";
+                btnRec.className = "round-btn clignote-orange";
+            }
+        });
+
+        function rafraichirVisuel() {
+            let ligneCible = (resetActif && etatCourant === "STOPPED") ? 1 : indexPoint;
+            
+            liveDataDisplay.innerHTML = `
+                <strong>LIGNE CIBLE :</strong> ${ligneCible} <br>
+                <strong>ACCEL :</strong> X: ${mesuresCourantes.x.toFixed(1)} | Y: ${mesuresCourantes.y.toFixed(1)} | Z: ${mesuresCourantes.z.toFixed(1)} <br>
