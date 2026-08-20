@@ -59,7 +59,7 @@
 
     <script>
         // ⚠️ REMETTEZ VOTRE LIEN GOOGLE SCRIPT INTERMÉDIAIRE ICI (LIGNE 74)
-        const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbzWt_MJtnf4b3w-cKjoehJndX1X0lDOgkEKQ_7Gade8ovYs7KHoZ9M2AtEOSSKfdtOR/exec";
+        const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbzoQZhYDAeXb6SsGmXopDWauElMtGnLfx-9O9RwqhkexVjMez_R7pDKVmBvrVD048zK/exec";
 
         let etatCourant = "STOPPED"; 
         let intervalId = null;
@@ -185,16 +185,21 @@
             // On prévient l'interface
             document.getElementById('status-text').innerText = "⚡ Synchronisation en cours...";
             
+            // 🔥 METHODE ULTRA-COMPATIBLE : Envoi sous forme de formulaire texte
+            let formData = new FormData();
+            formData.append("donneesBloc", JSON.stringify({ points: listePoints }));
+            
             fetch(URL_GOOGLE_SCRIPT, {
                 method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ estUnBloc: true, points: listePoints })
+                body: formData
             })
             .then(() => {
-                console.log("Bloc transmis avec succès.");
+                document.getElementById('status-text').innerText = "✓ Données envoyées !";
             })
-            .catch(err => console.error(err));
+            .catch(err => {
+                console.error(err);
+                document.getElementById('status-text').innerText = "⚠️ Erreur réseau";
+            });
         }
     </script>
 </body>
