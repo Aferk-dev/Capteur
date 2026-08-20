@@ -80,7 +80,7 @@
 <script>
 	// Bloc n°3
     const VERSION_APP = "V7.4";
-    const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbyQ3Dy2gf4pjxsh7TAlJkYR8_LYrEp2E87-cXu1L6Y_mvWzCxVyRcLFmB0KPa1IIbo/exec";
+    const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbxjaBkpx4Q7LZuFkP8WB6rgwsuSI15aYJr89YBecBUWEDjTUEG3IuAPNGme534HDVPK/exec";
     let etatCourant = "STOPPED", intervalId = null, resetActif = false; 
     let indexPoint = 1; 
     let curX = 0, curY = 0, curZ = 0, curA = 0, curB = 0, curG = 0, blocDonneesSession = [];
@@ -230,35 +230,34 @@
         formData.append("donneesBloc", JSON.stringify({ points: listePoints }));
         formData.append("action", actionType);
         
-        fetch(URL_GOOGLE_SCRIPT, { method: "POST", body: formData })
-        .then(response => {
-            if (!response.ok) throw new Error("HTTP " + response.status);
-            return response.text(); // 🌟 ULTRA-ROBUSTE : On extrait le retour en texte brut
-        })
-        .then(texteBrut => {
-            // Si le serveur répond (peu importe le texte), la transmission est validée !
-            statusText.innerText = "Status : Flux synchronisé ✓";
-            
-            if (actionType === "STOP") {
-                statusText.innerText = "Status : CSV Téléchargé ✓";
-                
-                // 🌟 LE LIEN EXPORT DIRECT : Compilé proprement côté téléphone pour éviter les caprices de Google
-                // On extrait l'ID de votre script à partir de votre URL actuelle
-                let urlExportCSV = "https://google.com"; 
-                
-                // Déclenche instantanément la tentative de téléchargement automatique
-                window.location.href = urlExportCSV;
-                
-                // Affichage immédiat du bouton de secours jaune au cas où le navigateur bloque le pop-up
-                setTimeout(() => {
-                    statusText.innerHTML = "Status : <a href='" + urlExportCSV + "' target='_blank' style='color:#ffca28; font-weight:bold; text-decoration:underline;'>Clic ici pour ouvrir le CSV 📥</a>";
-                }, 1000);
-            }
-        })
-        .catch(err => { 
-            console.error(err); 
-            statusText.innerText = "Status : Bad liaison ⚠"; 
-        });
+		fetch(URL_GOOGLE_SCRIPT, { method: "POST", body: formDataReset })
+			.then(res => res.text())
+			.then(() => {
+				// Dès que Google valide l'action emballée, on libère le flux à 1
+				indexPoint = 1;
+				localStorage.setItem("dernier_index_virtuel", 1);
+				blocDonneesSession = [];
+				resetActif = false;
+				btnReset.classList.remove('actif');
+				
+				btnRec.style.background = "#ff0000";
+				btnRec.style.borderColor = "white";
+				btnRec.style.opacity = "1";
+				btnRec.style.pointerEvents = "auto";
+				labelRec.innerText = "REC";
+				
+				demarrerCaptureFlux(1);
+			})
+			.catch(err => {
+				console.error(err);
+				statusText.innerText = "Status : Échec Purge Réseau ⚠";
+				btnRec.style.background = "#ff0000";
+				btnRec.style.borderColor = "white";
+				btnRec.style.opacity = "1";
+				btnRec.style.pointerEvents = "auto";
+				labelRec.innerText = "REC";
+			});
+
     }
 
 	function rafraichirVisuel() {
