@@ -107,6 +107,12 @@
 	// 1. SYNCHRONISATION ET SÉCURITÉ AU DÉMARRAGE
 	// ==========================================
 	window.onload = () => {
+		// Injection immédiate et sécurisée de la version à l'écran
+		const titleBox = document.getElementById('title-version');
+		if (titleBox && typeof VERSION_APP !== 'undefined') {
+			titleBox.innerText = "Données de session (30Hz) [" + VERSION_APP + "] :";
+		}
+
 		statusText.innerText = "Status : Synchro tableur...";
 		btnRec.style.background = "#555555";
 		btnRec.style.opacity = "0.5";
