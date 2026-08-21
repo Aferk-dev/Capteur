@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Moniteur Virtual Cam Pro - V7.4</title>
+    <title>Moniteur Virtual Cam Pro - V8</title>
     <style>
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; background: #5b9bd5; font-family: -apple-system, sans-serif; height: 100%; min-height: -webkit-fill-available; color: white; display: flex; justify-content: center; align-items: center; overflow: hidden; }
@@ -113,11 +113,35 @@
 	// 1. SYNCHRONISATION ET SÉCURITÉ AU DÉMARRAGE
 	// ==========================================
 	window.onload = async () => {
+		alert("Étape 1 : Le script démarre !"); // Témoin 1
+		
 		// 1. On injecte la version et on affiche l'état d'attente
 		const titleBox = document.getElementById('title-version');
 		if (titleBox) {
-			titleBox.innerText = "Données de session (30Hz) [" + VERSION_APP + "] :";
+			try {
+				titleBox.innerText = "Données de session (30Hz) [V8.0] :";
+				alert("Étape 2 : Texte du titre modifié !"); // Témoin 2
+			} catch(e) {
+				alert("Crash Étape 2 : " + e.message);
+			}
 		}
+		
+		statusText.innerText = "Status : Synchro tableur...";
+		btnRec.style.background = "#555555";
+		btnRec.style.opacity = "0.5";
+		btnRec.style.pointerEvents = "none";
+
+		// 2. On lance IMMÉDIATEMENT le matériel local
+		alert("Étape 3 : Tentative d'allumage caméra/capteurs..."); // Témoin 3
+		if (typeof demarrerHardwarePhysique === 'function') {
+			try {
+				await demarrerHardwarePhysique();
+				alert("Étape 4 : Matériel initialisé avec succès !"); // Témoin 4
+			} catch(err) {
+				alert("Crash Matériel Étape 4 : " + err.message);
+			}
+		}
+
 		statusText.innerText = "Status : Synchro tableur...";
 		btnRec.style.background = "#555555";
 		btnRec.style.opacity = "0.5";
