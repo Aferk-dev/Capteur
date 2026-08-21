@@ -80,10 +80,14 @@
 <script>
 	// Bloc n°3
     const VERSION_APP = "V7.5";
-    const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbybw918-x5OcVoA-4R1K5Bk-AOz05aZHK0TltzGOWadFomxTk2XhXwr-mPlRUur4_wa/exec";
-    let etatCourant = "STOPPED", intervalId = null, resetActif = false; 
-    let indexPoint = 1; 
-    let curX = 0, curY = 0, curZ = 0, curA = 0, curB = 0, curG = 0, blocDonneesSession = [];
+    const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbzAfEvvQ8UZrFD6iNXmnJ31-Rgn5ZU816wcEaz6w5FmCDcP2cnC3V3HRm4IR3z1kJzh/exec";
+	let etatCourant = "STOPPED", intervalId = null, resetActif = false;
+	let indexPoint = 1;
+	let curX = 0, curY = 0, curZ = 0, curA = 0, curB = 0, curG = 0, blocDonneesSession = [];
+
+	// --- AJOUT DES DEUX VERROUS POUR LA V7.5 ---
+	let isSending = false;      // Empêche le télescopage des requêtes HTTP à 30Hz
+	let isRecording = false;    // Suit l'état actif/inactif du flux de la caméra
 
     const video = document.getElementById('video-preview'), btnRec = document.getElementById('btn-rec');
     const labelRec = document.getElementById('label-rec'), iconPause = document.getElementById('icon-pause');
@@ -211,55 +215,73 @@
     }
 
 	// Bloc n°4
-    btnStop.addEventListener('click', () => {
-        if (etatCourant === "RECORDING" || etatCourant === "PAUSED") {
-            clearInterval(intervalId); etatCourant = "STOPPED";
-            statusText.innerText = "Status : Finalisation du CSV...";
-            labelRec.style.display = "block"; labelRec.className = "";
-            iconPause.style.display = "none"; btnRec.className = "round-btn";
-            
-            envoyerFichierBlocComplet(blocDonneesSession, "STOP");
-            blocDonneesSession = []; 
-            rafraichirVisuel();
-        }
-    });
+	btnStop.addEventListener('click', () => {
+		if (etatCourant === "RECORDING" || etatCourant === "PAUSED") {
+			clearInterval(intervalId);
+			etatCourant = "STOPPED";
+			statusText.innerText = "Status : Finalisation du CSV...";
+			labelRec.style.display = "block"; labelRec.className = "";
+			iconPause.style.display = "none"; btnRec.className = "round-btn";
 
-    function envoyerFichierBlocComplet(listePoints, actionType) {
-        if (listePoints.length === 0 && actionType !== "STOP") return;
-        let formData = new FormData();
-        formData.append("donneesBloc", JSON.stringify({ points: listePoints }));
-        formData.append("action", actionType);
-        
-        fetch(URL_GOOGLE_SCRIPT, { method: "POST", body: formData })
-        .then(response => {
-            if (!response.ok) throw new Error("HTTP " + response.status);
-            return response.text(); // 🌟 ULTRA-ROBUSTE : On extrait le retour en texte brut
-        })
-        .then(texteBrut => {
-            // Si le serveur répond (peu importe le texte), la transmission est validée !
-            statusText.innerText = "Status : Flux synchronisé ✓";
-            
-            if (actionType === "STOP") {
-                statusText.innerText = "Status : CSV Téléchargé ✓";
-                
-                // 🌟 LE LIEN EXPORT DIRECT : Compilé proprement côté téléphone pour éviter les caprices de Google
-                // On extrait l'ID de votre script à partir de votre URL actuelle
-                let urlExportCSV = "https://google.com"; 
-                
-                // Déclenche instantanément la tentative de téléchargement automatique
-                window.location.href = urlExportCSV;
-                
-                // Affichage immédiat du bouton de secours jaune au cas où le navigateur bloque le pop-up
-                setTimeout(() => {
-                    statusText.innerHTML = "Status : <a href='" + urlExportCSV + "' target='_blank' style='color:#ffca28; font-weight:bold; text-decoration:underline;'>Clic ici pour ouvrir le CSV 📥</a>";
-                }, 1000);
-            }
-        })
-        .catch(err => { 
-            console.error(err); 
-            statusText.innerText = "Status : Bad liaison ⚠"; 
-        });
-    }
+			// SÉCURITÉ V7.5 : On mémorise s'il reste des points non envoyés
+			let pointsRestants = [...blocDonneesSession];
+			
+			// On vide immédiatement le bloc pour bloquer toute interférence à 30Hz
+			blocDonneesSession = [];
+
+			// On force l'envoi de clôture finale avec les derniers points collectés
+			envoyerFichierBlocComplet(pointsRestants, "STOP");
+			
+			rafraichirVisuel();
+		}
+	});
+
+
+	function envoyerFichierBlocComplet(listePoints, actionType) {
+		// ANTI-EMBOUTEILLAGE : Si un envoi est déjà en vol sur le flux continu, on saute ce tick
+		if (isSending && actionType !== "STOP") return;
+		if (listePoints.length === 0 && actionType !== "STOP") return;
+
+		isSending = true; // On active le verrou dès que la requête part
+
+		let formData = new FormData();
+		formData.append("donneesBloc", JSON.stringify({ points: listePoints }));
+		formData.append("action", actionType);
+
+		fetch(URL_GOOGLE_SCRIPT, { method: "POST", body: formData })
+		.then(response => {
+			if (!response.ok) throw new Error("HTTP " + response.status);
+			return response.text(); // ULTRA-ROBUSTE : On extraction le retour en texte brut
+		})
+		.then(texteBrut => {
+			// Si le serveur répond (peu importe le texte), la transmission est validée !
+			statusText.innerText = "Status : Flux synchronisé ✓";
+
+			if (actionType === "STOP") {
+				statusText.innerText = "Status : CSV Téléchargé ✓";
+
+				// ★ LE LIEN EXPORT DIRECT : Compilé proprement avec votre ID réel
+				let urlExportCSV = "https://docs.google.com/spreadsheets/d/12tDD9FTJ-FLpUQ5x6UorVOmvaruWlsYCNA2wFlyNBc8/edit?gid=0#gid=0";
+
+				// Déclenche instantanément la tentative de téléchargement automatique
+				window.location.href = urlExportCSV;
+
+				// Affichage immédiat du bouton de secours jaune au cas où le navigateur bloque le pop-up
+				setTimeout(() => {
+					statusText.innerHTML = "Status : <a href='" + urlExportCSV + "' target='_blank' style='color:#ffca28; font-weight:bold; " +
+					"text-decoration:underline;'>Clic ici pour ouvrir le CSV 💾</a>";
+				}, 1000);
+			}
+		})
+		.catch(err => {
+			console.error(err);
+			statusText.innerText = "Status : Bad liaison ⚠";
+		})
+		.finally(() => {
+			isSending = false; // LIBÉRATION DU VERROU : Indispensable pour laisser passer les requêtes suivantes
+		});
+	}
+
 
 	function rafraichirVisuel() {
 		// 🌟 CORRECTIF DIRECT : On affiche la valeur réelle de indexPoint en temps réel.
