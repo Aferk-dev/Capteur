@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Moniteur Virtual Cam Pro - V7.4</title>
+    <style>
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; background: #5b9bd5; font-family: -apple-system, sans-serif; height: 100%; min-height: -webkit-fill-available; color: white; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        
+        /* Conteneur principal utilisant la hauteur disponible réelle du navigateur */
+        .main-container { display: flex; flex-direction: column; width: 100%; max-width: 450px; height: 100vh; height: -webkit-fill-available; padding: 12px; gap: 10px; justify-content: space-between; }
+        
+        .video-zone { flex: 1.2; background: #000; border-radius: 25px; border: 3px solid #1f4e79; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        #video-preview { width: 100%; height: 100%; object-fit: cover; }
+        
+        .data-box { flex: 0.7; background: #000; border: 2px solid #aaa; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; line-height: 1.4; display: flex; flex-direction: column; justify-content: center; }
+        .data-box-title { border-bottom: 1px solid #555; padding-bottom: 4px; margin-bottom: 4px; font-weight: bold; color: #ddd; }
+        .buttons-zone { display: flex; justify-content: space-around; align-items: center; width: 100%; padding-bottom: 5px; gap: 10px; }
+        .round-btn { position: relative; width: 60px; height: 60px; border-radius: 50%; border: 3px solid white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); transition: transform 0.1s; color: white; }
+        .round-btn:active { transform: scale(0.92); }
+        #btn-reset { background: linear-gradient(135deg, #11998e, #38ef7d); }
+        #btn-reset.actif { background: #39ff14; box-shadow: 0 0 15px #39ff14; }
+        #btn-reset svg { width: 24px; height: 24px; fill: white; }
+        #btn-rec { background: #ff0000; }
+        .txt-vert-fluo { color: #39ff14; text-shadow: 0 0 8px #39ff14; }
+        .pause-icon { display: none; width: 18px; height: 22px; justify-content: space-between; }
+        .pause-bar { width: 6px; height: 100%; background: #ffa500; border-radius: 2px; }
+        .clignote-orange .pause-bar { animation: blinkOrange 1s infinite; }
+        @keyframes blinkOrange { 50% { background: #ff4500; } }
+        #btn-stop { background: linear-gradient(135deg, #777, #333); border-color: #bbb; }
+        .stop-core { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #d9534f, #c9302c); display: flex; align-items: center; justify-content: center; border: 2px solid #fff; font-size: 10px; }
+        #status-text { font-weight: bold; color: #ffca28; margin-top: 3px; }
+
+        /* 🌟 À INSÉRER ICI : Style pour griser le bouton REC pendant la purge */
+        .btn-verrouille {
+            background: #555555 !important;
+            border-color: #888888 !important;
+            color: #888888 !important;
+            cursor: not-allowed !important;
+            animation: pulseGris 1s infinite;
+        }
+        @keyframes pulseGris {
+            50% { opacity: 0.6; }
+        }
+
+        /* 🌟 REDRESSAGE ULTRA-COMPACT POUR LE SAMSUNG HORIZONTAL */
+        @media (orientation: landscape) {
+            .main-container { flex-direction: row; max-width: 100%; padding: 8px; gap: 12px; }
+            .video-zone { flex: 1.1; height: 100%; border-radius: 15px; }
+            .right-panel { flex: 0.9; display: flex; flex-direction: column; justify-content: space-between; height: 100%; min-height: 0; }
+            .data-box { flex: 1; padding: 8px; font-size: 0.8rem; min-height: 0; overflow: hidden; margin-bottom: 4px; }
+            .buttons-zone { flex-shrink: 0; padding-bottom: 2px; }
+            .round-btn { width: 48px; height: 48px; font-size: 11px; border-width: 2px; }
+            .stop-core { width: 32px; height: 32px; font-size: 8px; }
+            #btn-reset svg { width: 18px; height: 18px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="video-zone"><video id="video-preview" autoplay playsinline muted></video></div>
+        <div class="right-panel">
+            <div class="data-box">
+                <div id="title-version" class="data-box-title">Données de session (30Hz) :</div>
+                <div id="live-data">LIGNE INTERNE : 1 <br>AC: X: 0.0 | Y: 0.0 | Z: 0.0<br>ROT A: 0° | B: 0° | G: 0°<br>TAMPON REQUIS : 0 / 30 pts</div>
+                <div id="status-text">Status : Prêt</div>
+            </div>
+            <div class="buttons-zone">
+                <div id="btn-reset" class="round-btn">
+                    <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                </div>
+                <div id="btn-rec" class="round-btn"><span id="label-rec">REC</span>
+                    <div id="icon-pause" class="pause-icon"><div class="pause-bar"></div><div class="pause-bar"></div></div>
+                </div>
+                <div id="btn-stop" class="round-btn"><div class="stop-core">STOP</div></div>
+            </div>
+        </div>
+    </div>
+<script>
+	// Bloc n°3
+    const VERSION_APP = "V7.5";
+	// ==========================================
+	// CENTRALISATION DES VARIABLES ET CONFIGURATION
+	// ==========================================
+    const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbx5d7UPRsTMvZBcaYEr-aBwKoPeypyMdveMn1vunmeEp8u2d3QUcIqDptDZifbhzREw/exec";
+	const URL_EXPORT_CSV = "https://docs.google.com/spreadsheets/d/12tDD9FTJ-FLpUQ5x6UorVOmvaruWlsYCNA2wFlyNBc8/export?format=csv";
+
+	let indexPoint = 1;
+	let intervalId = null;
+	let blocDonneesSession = [];
+	let etatCourant = "STOPPED"; // États possibles : STOPPED, RECORDING, PAUSED
+	let isSending = false;
+	let telechargementLance = false;
+
+	// ==========================================
+	// 1. SYNCHRONISATION ET SÉCURITÉ AU DÉMARRAGE
+	// ==========================================
+	window.onload = () => {
+		statusText.innerText = "Status : Synchro tableur...";
+		btnRec.style.background = "#555555";
+		btnRec.style.opacity = "0.5";
+		btnRec.style.pointerEvents = "none";
+
+		fetch(URL_GOOGLE_SCRIPT)
+			.then(res => {
+				if (!res.ok) throw new Error();
+				return res.json();
+			})
+			.then(data => {
+				indexPoint = data.prochain_index;
+				localStorage.setItem('dernier_index_virtuel', indexPoint);
+				libererBoutonRec("Prêt ✓");
+			})
+			.catch(err => {
+				let memoire = localStorage.getItem("dernier_index_virtuel");
+				indexPoint = memoire ? parseInt(memoire) : 1;
+				libererBoutonRec("Prêt (Secours) ✓");
+			});
+	};
+
+	function libererBoutonRec(message) {
+		btnRec.style.background = "#ff0000";
+		btnRec.style.opacity = "1";
+		btnRec.style.pointerEvents = "auto";
+		statusText.innerText = "Status : " + message;
+		rafraichirVisuel();
+	}
+
+	// ==========================================
+	// 2. LOGIQUE DU BOUTON PRINCIPAL (REC / PAUSE)
+	// ==========================================
+	btnRec.addEventListener('click', () => {
+		// CAS A : DÉMARRAGE OU REPRISE DE L'ENREGISTREMENT
+		if (etatCourant === "STOPPED" || etatCourant === "PAUSED") {
+			etatCourant = "RECORDING";
+			telechargementLance = false; // Réinitialise le verrou au démarrage
+			
+			labelRec.style.display = "none";
+			iconPause.style.display = "none";
+			btnRec.className = "round-btn recording";
+			btnRec.style.background = "#222222"; 
+			
+			statusText.innerText = "Status : Enregistrement en cours...";
+			demarrerCaptureFlux();
+		} 
+		// CAS B : MISE EN PAUSE DE LA SESSION
+		else if (etatCourant === "RECORDING") {
+			etatCourant = "PAUSED";
+			
+			if (intervalId !== null) {
+				clearInterval(intervalId);
+				intervalId = null;
+			}
+			
+			labelRec.style.display = "none";
+			iconPause.style.display = "flex";
+			btnRec.className = "round-btn clignotant";
+			btnRec.style.background = "#ff0000";
+			
+			statusText.innerText = "Status : Session en pause";
+
+			// Envoi immédiat du résidu de points accumulés avant la pause
+			if (blocDonneesSession.length > 0) {
+				let pointsAvantPause = [...blocDonneesSession];
+				blocDonneesSession = [];
+				envoyerFichierBlocComplet(pointsAvantPause, "CONTINUE");
+			}
+			rafraichirVisuel();
+		}
+	});
+
+	// ==========================================
+	// 3. LOGIQUE DU BOUTON STOP (CLÔTURE FINALE)
+	// ==========================================
+	btnStop.addEventListener('click', () => {
+		if (etatCourant === "RECORDING" || etatCourant === "PAUSED") {
+			if (intervalId !== null) {
+				clearInterval(intervalId);
+				intervalId = null;
+			}
+			etatCourant = "STOPPED";
+			statusText.innerText = "Status : Finalisation du CSV...";
+			
+			labelRec.style.display = "block"; 
+			labelRec.className = "";
+			iconPause.style.display = "none"; 
+			btnRec.className = "round-btn";
+			btnRec.style.background = "#ff0000";
+
+			let pointsFinaux = [...blocDonneesSession];
+			blocDonneesSession = []; // Sécurise la mémoire immédiatement
+
+			envoyerFichierBlocComplet(pointsFinaux, "STOP");
+			rafraichirVisuel();
+		}
+	});
+
+	// ==========================================
+	// 4. LOGIQUE DU BOUTON RESET (PURGE AUTOMATIQUE)
+	// ==========================================
+	btnReset.addEventListener('click', () => {
+		if (etatCourant === "PAUSED" || etatCourant === "STOPPED") {
+			statusText.innerText = "Status : Purge du tableur en cours...";
+			
+			if (intervalId !== null) {
+				clearInterval(intervalId);
+				intervalId = null;
+			}
+			
+			blocDonneesSession = [];
+			indexPoint = 1;
+			localStorage.setItem('dernier_index_virtuel', 1);
+
+			let formDataReset = new FormData();
+			formDataReset.append("action", "RESET");
+
+			fetch(URL_GOOGLE_SCRIPT, { 
+				method: "POST", 
+				mode: "no-cors", 
+				body: formDataReset 
+			})
+			.then(() => {
+				statusText.innerText = "Status : Purge terminée (Tableur vierge) ✓";
+				rafraichirVisuel();
+			})
+			.catch(err => {
+				console.error(err);
+				statusText.innerText = "Status : Échec Purge Réseau ⚠";
+				rafraichirVisuel();
+			});
+		}
+	});
+
+	// ==========================================
+	// 5. MOTEUR DE CAPTURE CADENCÉ À 30HZ
+	// ==========================================
+	function demarrerCaptureFlux() {
+		if (intervalId !== null) clearInterval(intervalId);
+		
+		intervalId = setInterval(() => {
+			if (etatCourant !== "RECORDING") return;
+
+			// --- VOTRE CODE DE CAPTURE DE CAPTEURS RESTE ICI ---
+			// Ex: curX = acc.x, curY = acc.y... (Gardez vos lignes de calcul intactes)
+			
+			// Numérotation strictement séquentielle de 1 en 1, sans aucun trou
+			blocDonneesSession.push({
+				index: indexPoint,
+				x: curX || 0, y: curY || 0, z: curZ || 0,
+				alpha: curA || 0, beta: curB || 0, gamma: curG || 0,
+				mode: orient
+			});
+
+			indexPoint++; 
+			
+			if (blocDonneesSession.length >= 30) {
+				let paquetAEnvoyer = [...blocDonneesSession];
+				blocDonneesSession = [];
+				envoyerFichierBlocComplet(paquetAEnvoyer, "CONTINUE");
+			}
+			
+			rafraichirVisuel();
+		}, 1000 / 30);
+	}
+
+	// ==========================================
+	// 6. PROTOCOLE RÉSISTANT DE TRANSMISSION RÉSEAU
+	// ==========================================
+	function envoyerFichierBlocComplet(listePoints, actionType) {
+		if (etatCourant === "STOPPED" && actionType !== "STOP") {
+			isSending = false;
+			return;
+		}
+		if (listePoints.length === 0 && actionType !== "STOP") return;
+
+		isSending = true;
+
+		let formData = new FormData();
+		formData.append("donneesBloc", JSON.stringify({ points: listePoints }));
+		formData.append("action", actionType);
+
+		fetch(URL_GOOGLE_SCRIPT, { 
+			method: "POST", 
+			mode: "no-cors", 
+			body: formData 
+		})
+		.then(() => {
+			// CAS STOP : Blocage immédiat et lancement unique du téléchargement
+			if (actionType === "STOP" || etatCourant === "STOPPED") {
+				etatCourant = "STOPPED";
+				blocDonneesSession = [];
+				isSending = false;
+				statusText.innerText = "Status : CSV Téléchargé ✓";
+
+				if (!telechargementLance) {
+					telechargementLance = true;
+					window.location.href = URL_EXPORT_CSV;
+
+					setTimeout(() => {
+						statusText.innerHTML = "Status : <a href='" + URL_EXPORT_CSV + "' target='_blank' style='color:#ffca28; font-weight:bold; text-decoration:underline;'>Clic ici pour ouvrir le CSV 💾</a>";
+					}, 1000);
+				}
+				return;
+			}
+
+			// CAS CONTINUE : On met à jour l'affichage sans couper le moteur
+			statusText.innerText = "Status : Flux synchronisé ✓";
+			
+			if (etatCourant === "RECORDING" && intervalId === null) {
+				demarrerCaptureFlux();
+			}
+		})
+		.catch(err => {
+			console.error(err);
+			if (etatCourant !== "STOPPED") statusText.innerText = "Status : Erreur réseau ⚠";
+		})
+		.finally(() => {
+			if (etatCourant !== "STOPPED") isSending = false;
+		});
+	}
+
+	// ==========================================
+	// 7. RAFRAÎCHISSEMENT VISUEL DE L'ÉCRAN MOBILE
+	// ==========================================
+	function rafraichirVisuel() {
+		if (typeof liveDataDisplay !== 'undefined' && liveDataDisplay) {
+			liveDataDisplay.innerHTML = "Index Global : <b>" + indexPoint + "</b><br>" +
+										"Tampon en cours : <b>" + blocDonneesSession.length + " / 30 pts</b>";
+		}
+	}
+</script>
+</body>
+</html>
+
