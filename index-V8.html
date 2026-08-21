@@ -425,7 +425,7 @@
 	// ==========================================
 
 	// Capteur d'accélération (Axes X, Y, Z)
-	window.addEventListener('devicemotion', function(event) {
+	//window.addEventListener('devicemotion', function(event) {
 		if (event.accelerationIncludingGravity) {
 			curX = event.accelerationIncludingGravity.x || 0;
 			curY = event.accelerationIncludingGravity.y || 0;
@@ -434,14 +434,14 @@
 	});
 
 	// Capteur d'orientation (Angles Alpha, Beta, Gamma)
-	window.addEventListener('deviceorientation', function(event) {
+	//window.addEventListener('deviceorientation', function(event) {
 		curA = event.alpha || 0;
 		curB = event.beta || 0;
 		curG = event.gamma || 0;
 	});
 
 	// Détection du mode d'affichage du Samsung
-	window.addEventListener('orientationchange', function() {
+	//window.addEventListener('orientationchange', function() {
 		if (window.orientation === 90 || window.orientation === -90) {
 			orient = "LANDSCAPE";
 		} else {
@@ -450,16 +450,16 @@
 	});
 
 	// Flux vidéo d'arrière-plan synchrone pour la caméra arrière
-	if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-		navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })
-			.then(function(stream) {
-				let video = document.getElementById("videoPreview");
-				if (video) video.srcObject = stream;
-			})
-			.catch(function(err) {
-				console.error("Erreur d'accès à la caméra arrière :", err);
-			});
-	}
+//	if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+//		navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })
+//			.then(function(stream) {
+//				let video = document.getElementById("video-preview");
+//				if (video) video.srcObject = stream;
+//			})
+//			.catch(function(err) {
+//				console.error("Erreur d'accès à la caméra arrière :", err);
+//			});
+//	}
 
 </script>
 </body>
