@@ -238,20 +238,27 @@
 
 
 	function envoyerFichierBlocComplet(listePoints, actionType) {
-		// ANTI-EMBOUTEILLAGE : Si un envoi est déjà en vol sur le flux continu, on saute ce tick
+		// 1. ANTI-EMBOUTEILLAGE : Si un envoi est déjà en vol sur le flux continu, on saute ce tick
 		if (isSending && actionType !== "STOP") return;
 		if (listePoints.length === 0 && actionType !== "STOP") return;
 
 		isSending = true; // On active le verrou dès que la requête part
 
-		let formData = new FormData();
-		formData.append("donneesBloc", JSON.stringify({ points: listePoints }));
-		formData.append("action", actionType);
+		// SÉCURITÉ V7.5 : On emballe tout dans un objet JSON classique au lieu du FormData
+		let payloadJSON = {
+			action: actionType,
+			donneesBloc: JSON.stringify({ points: listPoints })
+		};
 
-		fetch(URL_GOOGLE_SCRIPT, { method: "POST", body: formData })
+		// Envoi en text/plain pour forcer le passage à travers les barrières CORS du smartphone
+		fetch(URL_GOOGLE_SCRIPT, { 
+			method: "POST", 
+			headers: { "Content-Type": "text/plain" },
+			body: JSON.stringify(payloadJSON) 
+		})
 		.then(response => {
 			if (!response.ok) throw new Error("HTTP " + response.status);
-			return response.text(); // ULTRA-ROBUSTE : On extraction le retour en texte brut
+			return response.text(); // ULTRA-ROBUSTE : On extrait le retour en texte brut
 		})
 		.then(texteBrut => {
 			// Si le serveur répond (peu importe le texte), la transmission est validée !
@@ -261,7 +268,7 @@
 				statusText.innerText = "Status : CSV Téléchargé ✓";
 
 				// ★ LE LIEN EXPORT DIRECT : Compilé proprement avec votre ID réel
-				let urlExportCSV = "https://docs.google.com/spreadsheets/d/12tDD9FTJ-FLpUQ5x6UorVOmvaruWlsYCNA2wFlyNBc8/edit?gid=0#gid=0";
+				let urlExportCSV = "https://docs.google.com/spreadsheets/d/12tDD9FTJ-FLpUQ5x6UorVOmvaruWlsYCNA2wFlyNBc8/export?format=csv";
 
 				// Déclenche instantanément la tentative de téléchargement automatique
 				window.location.href = urlExportCSV;
@@ -281,7 +288,6 @@
 			isSending = false; // LIBÉRATION DU VERROU : Indispensable pour laisser passer les requêtes suivantes
 		});
 	}
-
 
 	function rafraichirVisuel() {
 		// 🌟 CORRECTIF DIRECT : On affiche la valeur réelle de indexPoint en temps réel.
