@@ -237,53 +237,58 @@
 	});
 
 
-	function envoyerFichierBlocComplet(listePoints, actionType) {
-		// 1. ANTI-EMBOUTEILLAGE : Si un envoi est déjà en vol sur le flux continu, on saute ce tick
-		if (isSending && actionType !== "STOP") return;
-		if (listePoints.length === 0 && actionType !== "STOP") return;
+function envoyerFichierBlocComplet(listePoints, actionType) {
+    if (listePoints.length === 0 && actionType !== "STOP") return;
+    
+    let formData = new FormData();
+    formData.append("donneesBloc", JSON.stringify({ points: listePoints }));
+    formData.append("action", actionType);
 
-		isSending = true; // On active le verrou dès que la requête part
+    // CORRECTION V7.5 : On envoie la bonne variable (formData) et on force le mode no-cors
+    fetch(URL_GOOGLE_SCRIPT, { 
+        method: "POST", 
+        mode: "no-cors", // Sécurité Samsung
+        body: formData 
+    })
+    .then(() => {
+        // Dès que Google valide l'action emballée, on libère le flux à 1
+        indexPoint = 1;
+        localStorage.setItem('dernier_index_virtuel', 1);
+        blocDonneesSession = [];
+        resetActif = false;
+        btnReset.classList.remove('actif');
 
-		// SÉCURITÉ V7.5 : On emballe tout dans un objet JSON classique au lieu du FormData
-		let payloadJSON = {
-			action: actionType,
-			donneesBloc: JSON.stringify({ points: listPoints })
-		};
+        btnRec.style.background = "#ff0000";
+        btnRec.style.borderColor = "white";
+        btnRec.style.opacity = "1";
+        btnRec.style.pointerEvents = "auto";
+        labelRec.innerText = "REC";
 
-		// Envoi en text/plain pour forcer le passage à travers les barrières CORS du smartphone
-		fetch(URL_GOOGLE_SCRIPT, {
-			method: "POST",
-			mode: "no-cors", // LE PASSE-DROIT CORS : Essentiel sur smartphone
-			headers: { "Content-Type": "text/plain" },
-			body: JSON.stringify(payloadJSON)
-		})
-		.then(() => {
-			// En mode no-cors, la requête est transmise directement sans attendre de texte en retour
-			statusText.innerText = "Status : Flux synchronisé ✓";
+        statusText.innerText = "Status : Flux synchronisé ✓";
 
-			if (actionType === "STOP") {
-				statusText.innerText = "Status : CSV Téléchargé ✓";
+        // GESTION DU TÉLÉCHARGEMENT AUTOMATIQUE AU STOP
+        if (actionType === "STOP") {
+            statusText.innerText = "Status : CSV Téléchargé ✓";
+            let urlExportCSV = "https://google.com";
+            window.location.href = urlExportCSV;
 
-				// Déclenchement automatique du téléchargement de votre tableur
-				let urlExportCSV = "https://docs.google.com/spreadsheets/d/12tDD9FTJ-FLpUQ5x6UorVOmvaruWlsYCNA2wFlyNBc8/export?format=csv";
-				window.location.href = urlExportCSV;
-
-				// Bouton jaune de secours
-				setTimeout(() => {
-					statusText.innerHTML = "Status : <a href='" + urlExportCSV + "' target='_blank' style='color:#ffca28; font-weight:bold; " +
-					"text-decoration:underline;'>Clic ici pour ouvrir le CSV 💾</a>";
-				}, 1000);
-			}
-		})
-
-		.catch(err => {
-			console.error(err);
-			statusText.innerText = "Status : Bad liaison ⚠";
-		})
-		.finally(() => {
-			isSending = false; // LIBÉRATION DU VERROU : Indispensable pour laisser passer les requêtes suivantes
-		});
-	}
+            setTimeout(() => {
+                statusText.innerHTML = "Status : <a href='" + urlExportCSV + "' target='_blank' style='color:#ffca28; font-weight:bold; text-decoration:underline;'>Clic ici pour ouvrir le CSV 💾</a>";
+            }, 1000);
+        } else {
+            demarrerCaptureFlux(1);
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        statusText.innerText = "Status : Bad liaison ⚠";
+        btnRec.style.background = "#ff0000";
+        btnRec.style.borderColor = "white";
+        btnRec.style.opacity = "1";
+        btnRec.style.pointerEvents = "auto";
+        labelRec.innerText = "REC";
+    });
+}
 
 	function rafraichirVisuel() {
 		// 🌟 CORRECTIF DIRECT : On affiche la valeur réelle de indexPoint en temps réel.
