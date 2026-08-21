@@ -241,27 +241,39 @@
 		intervalId = setInterval(() => {
 			if (etatCourant !== "RECORDING") return;
 
-			// --- VOTRE CODE DE CAPTURE DE CAPTEURS RESTE ICI ---
-			// Ex: curX = acc.x, curY = acc.y... (Gardez vos lignes de calcul intactes)
+			// RÉINTEGRATION DES CAPTEURS V8 (Sécurisés contre le vide)
+			let xVal = (typeof curX !== 'undefined') ? curX : 0;
+			let yVal = (typeof curY !== 'undefined') ? curY : 0;
+			let zVal = (typeof curZ !== 'undefined') ? curZ : 0;
+			let aVal = (typeof curA !== 'undefined') ? curA : 0;
+			let bVal = (typeof curB !== 'undefined') ? curB : 0;
+			let gVal = (typeof curG !== 'undefined') ? curG : 0;
+			let modeOrient = (typeof orient !== 'undefined') ? orient : "PORTRAIT";
 			
-			// Numérotation strictement séquentielle de 1 en 1, sans aucun trou
+			// INDEXATION LISSÉE V8
 			blocDonneesSession.push({
 				index: indexPoint,
-				x: curX || 0, y: curY || 0, z: curZ || 0,
-				alpha: curA || 0, beta: curB || 0, gamma: curG || 0,
-				mode: orient
+				x: xVal, 
+				y: yVal, 
+				z: zVal,
+				alpha: aVal, 
+				beta: bVal, 
+				gamma: gVal,
+				mode: modeOrient
 			});
 
 			indexPoint++; 
 			
+			// Envoi automatique par paquets de 30 points
 			if (blocDonneesSession.length >= 30) {
 				let paquetAEnvoyer = [...blocDonneesSession];
-				blocDonneesSession = [];
+				blocDonneesSession = []; 
 				envoyerFichierBlocComplet(paquetAEnvoyer, "CONTINUE");
 			}
 			
 			rafraichirVisuel();
 		}, 1000 / 30);
+	}
 	}
 
 	// ==========================================
