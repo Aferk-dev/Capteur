@@ -80,7 +80,11 @@
 <script>
 	// Bloc n°3
     const VERSION_APP = "V7.5";
+	
     const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbxDsK_KX-Y1jw7G6Zl7jL1qrrhDeYMKbyUIgrukqvIEPaeNuLzSHF8Z3CUsuA7GSS5U/exec";
+	const URL_EXPORT_CSV = "https://docs.google.com/spreadsheets/d/12tDD9FTJ-FLpUQ5x6UorVOmvaruWlsYCNA2wFlyNBc8/export?format=csv";
+	let telechargementLance = false;
+	
 	let etatCourant = "STOPPED", intervalId = null, resetActif = false;
 	let indexPoint = 1;
 	let curX = 0, curY = 0, curZ = 0, curA = 0, curB = 0, curG = 0, blocDonneesSession = [];
@@ -268,14 +272,14 @@ btnStop.addEventListener('click', () => {
 
 
 function envoyerFichierBlocComplet(listePoints, actionType) {
-    // SÉCURITÉ ABSOLUE : Si l'utilisateur a cliqué sur STOP, on bloque toute exécution classique
+    // SÉCURITÉ ABSOLUE V7.5 : Si l'utilisateur a cliqué sur STOP, on bloque toute exécution parasite
     if (etatCourant === "STOPPED" && actionType !== "STOP") {
         isSending = false;
         return;
     }
     if (listePoints.length === 0 && actionType !== "STOP") return;
 
-    isSending = true; // Verrouillage du canal réseau
+    isSending = true;
 
     let formData = new FormData();
     formData.append("donneesBloc", JSON.stringify({ points: listePoints }));
@@ -287,39 +291,38 @@ function envoyerFichierBlocComplet(listePoints, actionType) {
         body: formData 
     })
     .then(() => {
-        // CAS NUMÉRO 1 : C'EST L'ORDRE DU BOUTON STOP
+        // CAS N°1 : GESTION DU STOP (NETTOYAGE ET CLÔTURE)
         if (actionType === "STOP" || etatCourant === "STOPPED") {
+            etatCourant = "STOPPED";
             if (typeof intervalId !== 'undefined' && intervalId) clearInterval(intervalId);
             intervalId = null;
             blocDonneesSession = [];
             isSending = false;
             
             statusText.innerText = "Status : CSV Téléchargé ✓";
-            
-            let urlExportCSV = "https://docs.google.com/spreadsheets/d/12tDD9FTJ-FLpUQ5x6UorVOmvaruWlsYCNA2wFlyNBc8/export?format=csv";
-            window.location.href = urlExportCSV;
 
-            setTimeout(() => {
-                statusText.innerHTML = "Status : <a href='" + urlExportCSV + "' target='_blank' style='color:#ffca28; font-weight:bold; text-decoration:underline;'>Clic ici pour ouvrir le CSV 💾</a>";
-            }, 1000);
-            return; // ON COUPE NET : Interdiction d'aller plus bas vers la relance
+            // SÉCURITÉ ANTI-TRIPLE TÉLÉCHARGEMENT : Une seule et unique exécution
+            if (typeof telechargementLance !== 'undefined' && !telechargementLance) {
+                telechargementLance = true;
+                
+                // UTILISATION DE VOTRE VARIABLE GLOBALE CENTRALISÉE
+                window.location.href = URL_EXPORT_CSV;
+
+                setTimeout(() => {
+                    statusText.innerHTML = "Status : <a href='" + URL_EXPORT_CSV + "' target='_blank' style='color:#ffca28; font-weight:bold; text-decoration:underline;'>Clic ici pour ouvrir le CSV 💾</a>";
+                }, 1000);
+            }
+            return; // ON S'ARRÊTE NET : Aucune relance possible
         }
 
-        // CAS NUMÉRO 2 : C'EST LE FLUX CONTINU (On nettoie le paquet de 30 et on continue)
+        // CAS N°2 : FLUX CONTINU (On vide le paquet de 30 et on continue)
         indexPoint = 1;
         localStorage.setItem('dernier_index_virtuel', 1);
         blocDonneesSession = [];
-        resetActif = false;
-        if (typeof btnReset !== 'undefined' && btnReset) btnReset.classList.remove('actif');
-
-        btnRec.style.background = "#ff0000";
-        btnRec.style.borderColor = "white";
-        btnRec.style.opacity = "1";
-        btnRec.style.pointerEvents = "auto";
-        labelRec.innerText = "REC";
+        
         statusText.innerText = "Status : Flux synchronisé ✓";
 
-        // Relance de la capture UNIQUEMENT si l'application est toujours en train de filmer
+        // CADENAS ANTI-BAGOTTAGE : On ne relance le moteur QUE si l'utilisateur est toujours activement en RECORDING
         if (etatCourant === "RECORDING") {
             demarrerCaptureFlux(1);
         }
@@ -329,13 +332,11 @@ function envoyerFichierBlocComplet(listePoints, actionType) {
         statusText.innerText = "Status : Erreur réseau ⚠";
     })
     .finally(() => {
-        // Ne rouvrir le verrou que si on n'a pas arrêté l'application
         if (etatCourant !== "STOPPED") {
             isSending = false;
         }
     });
 }
-
 
 	function rafraichirVisuel() {
 		// 🌟 CORRECTIF DIRECT : On affiche la valeur réelle de indexPoint en temps réel.
