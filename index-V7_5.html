@@ -241,20 +241,44 @@ btnStop.addEventListener('click', () => {
 
 
 function envoyerFichierBlocComplet(listePoints, actionType) {
+    // SÉCURITÉ ABSOLUE : Si l'utilisateur a cliqué sur STOP, on bloque toute exécution classique
+    if (etatCourant === "STOPPED" && actionType !== "STOP") {
+        isSending = false;
+        return;
+    }
     if (listePoints.length === 0 && actionType !== "STOP") return;
-    
+
+    isSending = true; // Verrouillage du canal réseau
+
     let formData = new FormData();
     formData.append("donneesBloc", JSON.stringify({ points: listePoints }));
     formData.append("action", actionType);
 
-    // Envoi sécurisé en mode no-cors sans attendre de texte en retour
     fetch(URL_GOOGLE_SCRIPT, { 
         method: "POST", 
         mode: "no-cors", 
         body: formData 
     })
     .then(() => {
-        // En mode no-cors, la promesse validée confirme que le paquet a quitté le téléphone
+        // CAS NUMÉRO 1 : C'EST L'ORDRE DU BOUTON STOP
+        if (actionType === "STOP" || etatCourant === "STOPPED") {
+            if (typeof intervalId !== 'undefined' && intervalId) clearInterval(intervalId);
+            intervalId = null;
+            blocDonneesSession = [];
+            isSending = false;
+            
+            statusText.innerText = "Status : CSV Téléchargé ✓";
+            
+            let urlExportCSV = "https://docs.google.com/spreadsheets/d/12tDD9FTJ-FLpUQ5x6UorVOmvaruWlsYCNA2wFlyNBc8/export?format=csv";
+            window.location.href = urlExportCSV;
+
+            setTimeout(() => {
+                statusText.innerHTML = "Status : <a href='" + urlExportCSV + "' target='_blank' style='color:#ffca28; font-weight:bold; text-decoration:underline;'>Clic ici pour ouvrir le CSV 💾</a>";
+            }, 1000);
+            return; // ON COUPE NET : Interdiction d'aller plus bas vers la relance
+        }
+
+        // CAS NUMÉRO 2 : C'EST LE FLUX CONTINU (On nettoie le paquet de 30 et on continue)
         indexPoint = 1;
         localStorage.setItem('dernier_index_virtuel', 1);
         blocDonneesSession = [];
@@ -266,35 +290,25 @@ function envoyerFichierBlocComplet(listePoints, actionType) {
         btnRec.style.opacity = "1";
         btnRec.style.pointerEvents = "auto";
         labelRec.innerText = "REC";
-
         statusText.innerText = "Status : Flux synchronisé ✓";
 
-        // GESTION DU TÉLÉCHARGEMENT DU CSV AU STOP
-        if (actionType === "STOP") {
-            statusText.innerText = "Status : CSV Téléchargé ✓";
-            
-            let urlExportCSV = "https://docs.google.com/spreadsheets/d/12tDD9FTJ-FLpUQ5x6UorVOmvaruWlsYCNA2wFlyNBc8/export?format=csv";
-            window.location.href = urlExportCSV;
-
-            setTimeout(() => {
-				statusText.innerHTML = "Status : <a href='" + urlExportCSV + "' target='_blank' " +
-				"style='color:#ffca28; font-weight:bold; text-decoration:underline;'>Clic ici pour ouvrir le CSV 💾</a>";
- 
-            }, 1000);
-        } else {
+        // Relance de la capture UNIQUEMENT si l'application est toujours en train de filmer
+        if (etatCourant === "RECORDING") {
             demarrerCaptureFlux(1);
         }
     })
     .catch(err => {
-        console.error("Erreur réseau capturée :", err);
-        statusText.innerText = "Status : Échec Purge Réseau ⚠";
-        btnRec.style.background = "#ff0000";
-        btnRec.style.borderColor = "white";
-        btnRec.style.opacity = "1";
-        btnRec.style.pointerEvents = "auto";
-        labelRec.innerText = "REC";
+        console.error(err);
+        statusText.innerText = "Status : Erreur réseau ⚠";
+    })
+    .finally(() => {
+        // Ne rouvrir le verrou que si on n'a pas arrêté l'application
+        if (etatCourant !== "STOPPED") {
+            isSending = false;
+        }
     });
 }
+
 
 	function rafraichirVisuel() {
 		// 🌟 CORRECTIF DIRECT : On affiche la valeur réelle de indexPoint en temps réel.
