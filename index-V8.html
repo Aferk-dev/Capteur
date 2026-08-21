@@ -135,6 +135,8 @@
 		btnRec.style.pointerEvents = "auto";
 		statusText.innerText = "Status : " + message;
 		rafraichirVisuel();
+	    demarrerHardwarePhysique();
+
 	}
 	// =========================================================================
 	// RESTAURATION MATÉRIELLE V8 : INITIALISATION CAMÉRA ET CAPTEURS PHYSIQUES
@@ -188,8 +190,6 @@
 		majOrientation(); // Calcul initial
 	}
 
-	// Lancement automatique du matériel en parallèle du réseau au chargement
-	demarrerHardwarePhysique();
 
 	// ==========================================
 	// 2. LOGIQUE DU BOUTON PRINCIPAL (REC / PAUSE)
