@@ -59,7 +59,7 @@
 </head>
 <body>
     <div class="main-container">
-        <div class="video-zone"><video id="video-preview" autoplay playsinline muted></video></div>
+        		<div class="video-zone"><video id="video-preview" autoplay playsinline muted style="width: 100%; height: auto; object-fit: contain;"></video></div>
         <div class="right-panel">
             <div class="data-box">
                 <div id="title-version" class="data-box-title">Données de session (30Hz) :</div>
@@ -140,54 +140,58 @@
 	// =========================================================================
 	// RESTAURATION MATÉRIELLE V8 : INITIALISATION CAMÉRA ET CAPTEURS PHYSIQUES
 	// =========================================================================
+	// ==========================================
+	// CAPTURE MATÉRIELLE TOTALEMENT DÉCOUPLÉE V8
+	// ==========================================
 	async function demarrerHardwarePhysique() {
-		console.log("Tentative d'allumage de la caméra et des capteurs...");
-		
-		// 1. Allumage de la caméra arrière (Format léger adapté au 30Hz)
+		console.log("Démarrage du matériel physique...");
+
+		// 1. BLOC ISOLÉ POUR LA CAMÉRA (Si elle plante, elle ne bloque plus les capteurs)
 		try {
 			const contraintes = {
-				video: { facingMode: { ideal: "environment" } },
+				video: { facingMode: "environment" }, // Version simplifiée acceptée par tous les Samsung
 				audio: false
 			};
 			const stream = await navigator.mediaDevices.getUserMedia(contraintes);
 			const videoElement = document.getElementById('video-preview');
 			if (videoElement) {
 				videoElement.srcObject = stream;
-				videoElement.play().catch(e => console.log("Attente interaction play:", e));
+				videoElement.setAttribute('playsinline', true);
+				videoElement.setAttribute('webkit-playsinline', true);
+				await videoElement.play().catch(e => console.log("Play bloqué:", e));
 			}
 		} catch (err) {
-			console.error("Erreur d'accès caméra : ", err);
+			// Affiche l'erreur réelle sur l'écran du Samsung au lieu de la cacher dans la console
+			alert("Alerte Caméra : " + err.message + "\n(Les capteurs vont quand même démarrer)");
 		}
 
-		// 2. Écouteur des accélérations physiques (Colonnes C, D, E du tableur)
+		// 2. BLOC DES CAPTEURS (S'exécute obligatoirement, même sans caméra)
 		window.addEventListener('devicemotion', (e) => {
-			if (e.accelerationIncludingGravity) {
-				curX = e.accelerationIncludingGravity.x || 0;
-				curY = e.accelerationIncludingGravity.y || 0;
-				curZ = e.accelerationIncludingGravity.z || 0;
+			const acc = e.accelerationIncludingGravity;
+			if (acc) {
+				curX = acc.x || 0;
+				curY = acc.y || 0;
+				curZ = acc.z || 0;
 				rafraichirVisuel();
 			}
-		});
+		}, true);
 
-		// 3. Écouteur des rotations gyroscopiques (Colonnes F, G, H du tableur)
 		window.addEventListener('deviceorientation', (e) => {
 			curA = e.alpha || 0;
 			curB = e.beta || 0;
 			curG = e.gamma || 0;
 			rafraichirVisuel();
-		});
+		}, true);
 
-		// 4. Écouteur de l'orientation de l'écran (Colonne I du tableur)
-		const majOrientation = () => {
+		window.addEventListener('orientationchange', () => {
 			if (window.screen && window.screen.orientation) {
 				orient = window.screen.orientation.type.includes("portrait") ? "PORTRAIT" : "LANDSCAPE";
 			} else {
 				orient = window.innerHeight > window.innerWidth ? "PORTRAIT" : "LANDSCAPE";
 			}
-		};
-		window.addEventListener('orientationchange', majOrientation);
-		majOrientation(); // Calcul initial
+		});
 	}
+
 
 
 	// ==========================================
