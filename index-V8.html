@@ -103,22 +103,32 @@
 		return false;
 	};
 
+	const liveDataDisplay = document.getElementById("live-data");
+	const statusText = document.getElementById("status-text");
+	const btnRec = document.getElementById("btn-rec");
+	const btnStop = document.getElementById("btn-stop");
+	const btnReset = document.getElementById("btn-reset");
 
 	// ==========================================
 	// 1. SYNCHRONISATION ET SÉCURITÉ AU DÉMARRAGE
 	// ==========================================
-	window.onload = () => {
-		// Injection immédiate et sécurisée de la version à l'écran
+	window.onload = async () => {
+		// 1. On injecte la version et on affiche l'état d'attente
 		const titleBox = document.getElementById('title-version');
-		if (titleBox && typeof VERSION_APP !== 'undefined') {
+		if (titleBox) {
 			titleBox.innerText = "Données de session (30Hz) [" + VERSION_APP + "] :";
 		}
-
 		statusText.innerText = "Status : Synchro tableur...";
 		btnRec.style.background = "#555555";
 		btnRec.style.opacity = "0.5";
 		btnRec.style.pointerEvents = "none";
 
+		// 2. On lance IMMÉDIATEMENT le matériel local (comme en V7.5)
+		if (typeof demarrerHardwarePhysique === 'function') {
+			await demarrerHardwarePhysique();
+		}
+
+		// 3. On lance la requête réseau vers Google en parallèle
 		fetch(URL_GOOGLE_SCRIPT)
 			.then(res => {
 				if (!res.ok) throw new Error();
@@ -129,12 +139,13 @@
 				localStorage.setItem('dernier_index_virtuel', indexPoint);
 				libererBoutonRec("Prêt ✓");
 			})
-			.catch(err => {
+			.catch(() => {
 				let memoire = localStorage.getItem("dernier_index_virtuel");
 				indexPoint = memoire ? parseInt(memoire) : 1;
 				libererBoutonRec("Prêt (Secours) ✓");
 			});
 	};
+
 
 	function libererBoutonRec(message) {
 		btnRec.style.background = "#ff0000";
