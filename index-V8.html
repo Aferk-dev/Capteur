@@ -135,7 +135,6 @@
 		btnRec.style.pointerEvents = "auto";
 		statusText.innerText = "Status : " + message;
 		rafraichirVisuel();
-	    demarrerHardwarePhysique();
 
 	}
 	// =========================================================================
@@ -194,8 +193,13 @@
 	// ==========================================
 	// 2. LOGIQUE DU BOUTON PRINCIPAL (REC / PAUSE)
 	// ==========================================
-	btnRec.addEventListener('click', () => {
-		// CAS A : DÉMARRAGE OU REPRISE DE L'ENREGISTREMENT
+	//btnRec.addEventListener('click', () => {
+	btnRec.addEventListener('click', async () => {
+		if (typeof demarrerHardwarePhysique === 'function') {
+			await demarrerHardwarePhysique();
+		}
+	
+			// CAS A : DÉMARRAGE OU REPRISE DE L'ENREGISTREMENT
 		if (etatCourant === "STOPPED" || etatCourant === "PAUSED") {
 			etatCourant = "RECORDING";
 			telechargementLance = false; // Réinitialise le verrou au démarrage
