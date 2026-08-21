@@ -252,25 +252,46 @@
 
 
 // Bloc n°4
-btnStop.addEventListener('click', () => {
-    if (etatCourant === "RECORDING" || etatCourant === "PAUSED") {
-        clearInterval(intervalId);
-        intervalId = null; // SÉCURITÉ V7.5 : Désactive physiquement la variable de l'intervalle
-        etatCourant = "STOPPED"; // Changement d'état global
+btnRec.addEventListener('click', () => {
+    // CAS N°1 : SI L'APPLICATION EST À L'ARRÊT OU EN PAUSE -> ON LANCE L'ENREGISTREMENT
+    if (etatCourant === "STOPPED" || etatCourant === "PAUSED") {
+        etatCourant = "RECORDING";
         
-        statusText.innerText = "Status : Finalisation du CSV...";
-        labelRec.style.display = "block"; labelRec.className = "";
-        iconPause.style.display = "none"; btnRec.className = "round-btn";
-
-        // SÉCURITÉ V7.5 : On mémorise s'il reste des points non envoyés
-        let pointsRestants = [...blocDonneesSession];
+        // Ajustement visuel des boutons pour le mode Enregistrement
+        labelRec.style.display = "none";
+        iconPause.style.display = "none";
+        btnRec.className = "round-btn recording";
+        btnRec.style.background = "#222222"; // Devient sombre pendant l'enregistrement
         
-        // On vide immédiatement le bloc pour bloquer toute interférence à 30Hz
-        blocDonneesSession = [];
-
-        // On force l'envoi de clôture finale avec les derniers points collectés
-        envoyerFichierBlocComplet(pointsRestants, "STOP");
+        // DÉMARRAGE SÉCURISÉ V7.5 (Sans paramètre relatif)
+        demarrerCaptureFlux();
+        statusText.innerText = "Status : Enregistrement en cours...";
+    } 
+    
+    // CAS N°2 : SI L'APPLICATION EST EN TRAIN DE FILMER -> ON MET EN PAUSE
+    else if (etatCourant === "RECORDING") {
+        etatCourant = "PAUSED";
         
+        // Arrêt immédiat du moteur à 30Hz
+        if (intervalId !== null) {
+            clearInterval(intervalId);
+            intervalId = null;
+        }
+        
+        // Ajustement visuel pour le mode Pause
+        labelRec.style.display = "none";
+        iconPause.style.display = "flex";
+        btnRec.className = "round-btn clignotant";
+        btnRec.style.background = "#ff0000"; // Revient au rouge
+        
+        // Envoi de sécurité des points accumulés avant la pause
+        if (blocDonneesSession.length > 0) {
+            let pointsAvantPause = [...blocDonneesSession];
+            blocDonneesSession = [];
+            envoyerFichierBlocComplet(pointsAvantPause, "CONTINUE");
+        }
+        
+        statusText.innerText = "Status : Session en pause";
         rafraichirVisuel();
     }
 });
