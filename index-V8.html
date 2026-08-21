@@ -98,10 +98,11 @@
 	let telechargementLance = false;
 	
 	// ESPION DE SÉCURITÉ V8 : Attrape le crash et l'affiche sur l'écran du Samsung
-	window.onerror = function(message, source, lineno, colno, error) {
-		alert("🔴 BUG DETECTÉ ! \n\nMessage : " + message + "\n\nLigne : " + lineno);
+	window.onerror = function(msg, url, line) {
+		alert("Bug detecte a la ligne " + line + " : " + msg);
 		return false;
 	};
+
 
 	// ==========================================
 	// 1. SYNCHRONISATION ET SÉCURITÉ AU DÉMARRAGE
