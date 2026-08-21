@@ -79,12 +79,16 @@
     </div>
 <script>
 	// Bloc n°3
-    const VERSION_APP = "V7.5";
+    const VERSION_APP = "V8.0";
 	// ==========================================
 	// CENTRALISATION DES VARIABLES ET CONFIGURATION
 	// ==========================================
     const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbx5d7UPRsTMvZBcaYEr-aBwKoPeypyMdveMn1vunmeEp8u2d3QUcIqDptDZifbhzREw/exec";
 	const URL_EXPORT_CSV = "https://docs.google.com/spreadsheets/d/12tDD9FTJ-FLpUQ5x6UorVOmvaruWlsYCNA2wFlyNBc8/export?format=csv";
+
+	let curX = 0, curY = 0, curZ = 0;
+	let curA = 0, curB = 0, curG = 0;
+	let orient = "PORTRAIT";
 
 	let indexPoint = 1;
 	let intervalId = null;
@@ -132,6 +136,60 @@
 		statusText.innerText = "Status : " + message;
 		rafraichirVisuel();
 	}
+	// =========================================================================
+	// RESTAURATION MATÉRIELLE V8 : INITIALISATION CAMÉRA ET CAPTEURS PHYSIQUES
+	// =========================================================================
+	async function demarrerHardwarePhysique() {
+		console.log("Tentative d'allumage de la caméra et des capteurs...");
+		
+		// 1. Allumage de la caméra arrière (Format léger adapté au 30Hz)
+		try {
+			const contraintes = {
+				video: { facingMode: { ideal: "environment" } },
+				audio: false
+			};
+			const stream = await navigator.mediaDevices.getUserMedia(contraintes);
+			const videoElement = document.getElementById('video-preview');
+			if (videoElement) {
+				videoElement.srcObject = stream;
+				videoElement.play().catch(e => console.log("Attente interaction play:", e));
+			}
+		} catch (err) {
+			console.error("Erreur d'accès caméra : ", err);
+		}
+
+		// 2. Écouteur des accélérations physiques (Colonnes C, D, E du tableur)
+		window.addEventListener('devicemotion', (e) => {
+			if (e.accelerationIncludingGravity) {
+				curX = e.accelerationIncludingGravity.x || 0;
+				curY = e.accelerationIncludingGravity.y || 0;
+				curZ = e.accelerationIncludingGravity.z || 0;
+				rafraichirVisuel();
+			}
+		});
+
+		// 3. Écouteur des rotations gyroscopiques (Colonnes F, G, H du tableur)
+		window.addEventListener('deviceorientation', (e) => {
+			curA = e.alpha || 0;
+			curB = e.beta || 0;
+			curG = e.gamma || 0;
+			rafraichirVisuel();
+		});
+
+		// 4. Écouteur de l'orientation de l'écran (Colonne I du tableur)
+		const majOrientation = () => {
+			if (window.screen && window.screen.orientation) {
+				orient = window.screen.orientation.type.includes("portrait") ? "PORTRAIT" : "LANDSCAPE";
+			} else {
+				orient = window.innerHeight > window.innerWidth ? "PORTRAIT" : "LANDSCAPE";
+			}
+		};
+		window.addEventListener('orientationchange', majOrientation);
+		majOrientation(); // Calcul initial
+	}
+
+	// Lancement automatique du matériel en parallèle du réseau au chargement
+	demarrerHardwarePhysique();
 
 	// ==========================================
 	// 2. LOGIQUE DU BOUTON PRINCIPAL (REC / PAUSE)
@@ -350,9 +408,6 @@
 	// ==========================================
 	// 8. ÉCOUTEURS DES CAPTEURS ET CAPTURE VIDÉO NATIVE
 	// ==========================================
-	let curX = 0, curY = 0, curZ = 0;
-	let curA = 0, curB = 0, curG = 0;
-	let orient = "PORTRAIT";
 
 	// Capteur d'accélération (Axes X, Y, Z)
 	window.addEventListener('devicemotion', function(event) {
