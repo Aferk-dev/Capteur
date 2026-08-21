@@ -95,13 +95,35 @@
     const liveDataDisplay = document.getElementById('live-data'), statusText = document.getElementById('status-text');
     document.getElementById('title-version').innerText = "Data (30Hz) - " + VERSION_APP + " :";
 
-    // Synchronisation au chargement de la page
-    statusText.innerText = "Status : Synchro tableur...";
-    fetch(URL_GOOGLE_SCRIPT)
-        .then(res => res.json())
-        .then(data => { indexPoint = data.prochain_index; statusText.innerText = "Status : Prêt"; rafraichirVisuel(); })
-        .catch(err => { let memoire = localStorage.getItem("dernier_index_virtuel"); indexPoint = memoire ? parseInt(memoire) : 1; statusText.innerText = "Status : Prêt (Secours)"; rafraichirVisuel(); });
+	// // Synchronisation au chargement de la page (Sécurisée V7.5)
+	statusText.innerText = "Status : Synchro tableur...";
+	btnRec.style.background = "#555555";
+	btnRec.style.opacity = "0.5";
+	btnRec.style.pointerEvents = "none";
 
+	fetch(URL_GOOGLE_SCRIPT)
+		.then(res => {
+			if (!res.ok) throw new Error();
+			return res.json();
+		})
+		.then(data => {
+			indexPoint = data.prochain_index;
+			btnRec.style.background = "#ff0000";
+			btnRec.style.opacity = "1";
+			btnRec.style.pointerEvents = "auto";
+			statusText.innerText = "Status : Prêt ✓";
+			rafraichirVisuel();
+		})
+		.catch(err => {
+			let memoire = localStorage.getItem("dernier_index_virtuel");
+			indexPoint = memoire ? parseInt(memoire) : 1;
+			btnRec.style.background = "#ff0000";
+			btnRec.style.opacity = "1";
+			btnRec.style.pointerEvents = "auto";
+			statusText.innerText = "Status : Prêt (Secours) ✓";
+			rafraichirVisuel();
+		});
+		
     async function demarrerCameraVideo() {
         try { const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false }); video.srcObject = stream; } 
         catch (err) { console.error("Erreur caméra : " + err.message); }
