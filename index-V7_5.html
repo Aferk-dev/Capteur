@@ -251,35 +251,31 @@
 		};
 
 		// Envoi en text/plain pour forcer le passage à travers les barrières CORS du smartphone
-		fetch(URL_GOOGLE_SCRIPT, { 
-			method: "POST", 
+		fetch(URL_GOOGLE_SCRIPT, {
+			method: "POST",
+			mode: "no-cors", // LE PASSE-DROIT CORS : Essentiel sur smartphone
 			headers: { "Content-Type": "text/plain" },
-			body: JSON.stringify(payloadJSON) 
+			body: JSON.stringify(payloadJSON)
 		})
-		.then(response => {
-			if (!response.ok) throw new Error("HTTP " + response.status);
-			return response.text(); // ULTRA-ROBUSTE : On extrait le retour en texte brut
-		})
-		.then(texteBrut => {
-			// Si le serveur répond (peu importe le texte), la transmission est validée !
+		.then(() => {
+			// En mode no-cors, la requête est transmise directement sans attendre de texte en retour
 			statusText.innerText = "Status : Flux synchronisé ✓";
 
 			if (actionType === "STOP") {
 				statusText.innerText = "Status : CSV Téléchargé ✓";
 
-				// ★ LE LIEN EXPORT DIRECT : Compilé proprement avec votre ID réel
+				// Déclenchement automatique du téléchargement de votre tableur
 				let urlExportCSV = "https://docs.google.com/spreadsheets/d/12tDD9FTJ-FLpUQ5x6UorVOmvaruWlsYCNA2wFlyNBc8/export?format=csv";
-
-				// Déclenche instantanément la tentative de téléchargement automatique
 				window.location.href = urlExportCSV;
 
-				// Affichage immédiat du bouton de secours jaune au cas où le navigateur bloque le pop-up
+				// Bouton jaune de secours
 				setTimeout(() => {
 					statusText.innerHTML = "Status : <a href='" + urlExportCSV + "' target='_blank' style='color:#ffca28; font-weight:bold; " +
 					"text-decoration:underline;'>Clic ici pour ouvrir le CSV 💾</a>";
 				}, 1000);
 			}
 		})
+
 		.catch(err => {
 			console.error(err);
 			statusText.innerText = "Status : Bad liaison ⚠";
