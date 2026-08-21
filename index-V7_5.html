@@ -204,11 +204,11 @@
 				});
 
             } 
-            // ⚪ CAS N°2 : REPRISE EN CONTINUITÉ CLASSIQUE
-            else {
-                blocDonneesSession = [];
-                demarrerCaptureFlux(indexPoint);
-            }
+			// ○ CAS N°2 : REPRISE EN CONTINUITÉ CLASSIQUE
+			else {
+				etatCourant = "RECORDING"; // On rétablit l'état actif immédiatement
+				demarrerCaptureFlux();    // Appel simple sans paramètre pour conserver l'index global exact
+			}
             
         } else if (etatCourant === "RECORDING") {
             // Mise en pause standard
@@ -220,30 +220,35 @@
     });
 
     // 🌟 CORRECTION DE SÉCURITÉ : On force la fonction à recevoir l'index de départ exact
-    function demarrerCaptureFlux(indexDeDepart) {
-        indexPoint = indexDeDepart; // Assigne immédiatement l'index (1 ou la suite)
-        localStorage.setItem("dernier_index_virtuel", indexPoint);
+	function demarrerCaptureFlux() { // ÉTAPE 2 : On supprime le paramètre relatif
+		if (intervalId !== null) clearInterval(intervalId);
+		
+		intervalId = setInterval(() => {
+			if (etatCourant !== "RECORDING") return;
 
-        etatCourant = "RECORDING"; 
-        statusText.innerText = "Status : Capture active...";
-        labelRec.style.display = "block"; iconPause.style.display = "none";
-        labelRec.className = "txt-vert-fluo"; btnRec.className = "round-btn"; 
+			// ... (Conservez vos lignes existantes de lecture de capteurs : acc.x, curX, curY, etc.) ...
 
-        intervalId = setInterval(() => {
-            let orient = (screen.orientation && screen.orientation.type.includes("landscape")) ? "LANDSCAPE" : "PORTRAIT";
-            
-            blocDonneesSession.push({ index: indexPoint, x: curX, y: curY, z: curZ, alpha: curA, beta: curB, gamma: curG, mode: orient });
-            
-            indexPoint++;
-            localStorage.setItem("dernier_index_virtuel", indexPoint);
-            
-            if (blocDonneesSession.length >= 30) {
-                envoyerFichierBlocComplet(blocDonneesSession, "CONTINUE"); 
-                blocDonneesSession = []; 
-            }
-            rafraichirVisuel();
-        }, 33.3);
-    }
+			// INDEXATION LISSÉE : On s'appuie uniquement sur l'index global absolu
+			blocDonneesSession.push({
+				index: indexPoint, 
+				x: curX, y: curY, z: curZ,
+				alpha: curA, beta: curB, gamma: curG,
+				mode: orient
+			});
+
+			indexPoint++; // L'index monte de 1 en 1 de manière linéaire et continue
+			
+			// Déclenchement de l'envoi au bout de 30 points accumulés
+			if (blocDonneesSession.length >= 30) {
+				let paquetAEnvoyer = [...blocDonneesSession];
+				blocDonneesSession = []; // Vidage immédiat de la mémoire tampon
+				envoyerFichierBlocComplet(paquetAEnvoyer, "CONTINUE");
+			}
+			
+			rafraichirVisuel();
+		}, 1000 / 30);
+	}
+
 
 // Bloc n°4
 btnStop.addEventListener('click', () => {
