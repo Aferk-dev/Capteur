@@ -214,27 +214,30 @@
         }, 33.3);
     }
 
-	// Bloc n°4
-	btnStop.addEventListener('click', () => {
-		if (etatCourant === "RECORDING" || etatCourant === "PAUSED") {
-			clearInterval(intervalId);
-			etatCourant = "STOPPED";
-			statusText.innerText = "Status : Finalisation du CSV...";
-			labelRec.style.display = "block"; labelRec.className = "";
-			iconPause.style.display = "none"; btnRec.className = "round-btn";
+// Bloc n°4
+btnStop.addEventListener('click', () => {
+    if (etatCourant === "RECORDING" || etatCourant === "PAUSED") {
+        clearInterval(intervalId);
+        intervalId = null; // SÉCURITÉ V7.5 : Désactive physiquement la variable de l'intervalle
+        etatCourant = "STOPPED"; // Changement d'état global
+        
+        statusText.innerText = "Status : Finalisation du CSV...";
+        labelRec.style.display = "block"; labelRec.className = "";
+        iconPause.style.display = "none"; btnRec.className = "round-btn";
 
-			// SÉCURITÉ V7.5 : On mémorise s'il reste des points non envoyés
-			let pointsRestants = [...blocDonneesSession];
-			
-			// On vide immédiatement le bloc pour bloquer toute interférence à 30Hz
-			blocDonneesSession = [];
+        // SÉCURITÉ V7.5 : On mémorise s'il reste des points non envoyés
+        let pointsRestants = [...blocDonneesSession];
+        
+        // On vide immédiatement le bloc pour bloquer toute interférence à 30Hz
+        blocDonneesSession = [];
 
-			// On force l'envoi de clôture finale avec les derniers points collectés
-			envoyerFichierBlocComplet(pointsRestants, "STOP");
-			
-			rafraichirVisuel();
-		}
-	});
+        // On force l'envoi de clôture finale avec les derniers points collectés
+        envoyerFichierBlocComplet(pointsRestants, "STOP");
+        
+        rafraichirVisuel();
+    }
+});
+
 
 
 function envoyerFichierBlocComplet(listePoints, actionType) {
@@ -270,12 +273,13 @@ function envoyerFichierBlocComplet(listePoints, actionType) {
         if (actionType === "STOP") {
             statusText.innerText = "Status : CSV Téléchargé ✓";
             
-            let urlExportCSV = "https://google.com";
+            let urlExportCSV = "https://docs.google.com/spreadsheets/d/12tDD9FTJ-FLpUQ5x6UorVOmvaruWlsYCNA2wFlyNBc8/export?format=csv";
             window.location.href = urlExportCSV;
 
             setTimeout(() => {
-                statusText.innerHTML = "Status : <a href='" + urlExportCSV + "' target='_blank' style='color:#ffca28; font-weight:bold; " +
-                "text-decoration:underline;'>Clic ici pour ouvrir le CSV 💾</a>";
+				statusText.innerHTML = "Status : <a href='" + urlExportCSV + "' target='_blank' " +
+				"style='color:#ffca28; font-weight:bold; text-decoration:underline;'>Clic ici pour ouvrir le CSV 💾</a>";
+ 
             }, 1000);
         } else {
             demarrerCaptureFlux(1);
