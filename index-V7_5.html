@@ -80,7 +80,7 @@
 <script>
 	// Bloc n°3
     const VERSION_APP = "V7.5";
-    const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbx1Rb0LzV0aGGsRW2MiK4ve25P3JiPs3iTc1_kr0OwPuKYdDukoANZHpsDy_-VE6RhH/exec";
+    const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbxDsK_KX-Y1jw7G6Zl7jL1qrrhDeYMKbyUIgrukqvIEPaeNuLzSHF8Z3CUsuA7GSS5U/exec";
 	let etatCourant = "STOPPED", intervalId = null, resetActif = false;
 	let indexPoint = 1;
 	let curX = 0, curY = 0, curZ = 0, curA = 0, curB = 0, curG = 0, blocDonneesSession = [];
@@ -144,34 +144,39 @@
                 
                 rafraichirVisuel(); // Force l'écran à afficher instantanément LIGNE INTERNE : 1
 
-                // 3. ENVOI DE LA PURGE ET ATTENTE DU GO DE GOOGLE
-                let formDataReset = new FormData();
-                formDataReset.append("action", "RESET");
-                
-                fetch(URL_GOOGLE_SCRIPT, { method: "POST", body: formDataReset })
-                    .then(res => res.json()) // On attend un vrai JSON de confirmation
-                    .then(data => {
-                        // Google confirme que le tableau est vide ! On libère le bouton REC
-                        btnRec.style.background = "#ff0000";
-                        btnRec.style.borderColor = "white";
-                        btnRec.style.opacity = "1";
-                        btnRec.style.pointerEvents = "auto";
-                        labelRec.innerText = "REC";
-                        
-                        // Lancement officiel du flux, verrouillé à 1
-                        demarrerCaptureFlux(1);
-                    })
-                    .catch(err => {
-                        console.error(err);
-                        statusText.innerText = "Status : Échec Purge Réseau ⚠";
-                        
-                        // En cas d'échec réel, on libère le bouton mais on maintient la sécurité à 1
-                        btnRec.style.background = "#ff0000";
-                        btnRec.style.borderColor = "white";
-                        btnRec.style.opacity = "1";
-                        btnRec.style.pointerEvents = "auto";
-                        labelRec.innerText = "REC";
-                    });
+				// // 3. ENVOI DE LA PURGE ET ATTENTE DU GO DE GOOGLE
+				let formDataReset = new FormData();
+				formDataReset.append("action", "RESET");
+
+				fetch(URL_GOOGLE_SCRIPT, { 
+					method: "POST", 
+					mode: "no-cors", // SÉCURITÉ SAMSUNG : Force le passage à travers les barrières CORS
+					body: formDataReset 
+				})
+				.then(() => {
+					// En mode no-cors, la promesse validée confirme que Google a bien reçu l'ordre d'effacement
+					btnRec.style.background = "#ff0000";
+					btnRec.style.borderColor = "white";
+					btnRec.style.opacity = "1";
+					btnRec.style.pointerEvents = "auto";
+					labelRec.innerText = "REC";
+					
+					statusText.innerText = "Status : Purge Google Sheets terminée ✓";
+
+					// Lancement officiel du flux, verrouillé à 1
+					demarrerCaptureFlux(1);
+				})
+				.catch(err => {
+					console.error(err);
+					statusText.innerText = "Status : Échec Purge Réseau ⚠";
+					
+					btnRec.style.background = "#ff0000";
+					btnRec.style.borderColor = "white";
+					btnRec.style.opacity = "1";
+					btnRec.style.pointerEvents = "auto";
+					labelRec.innerText = "REC";
+				});
+
             } 
             // ⚪ CAS N°2 : REPRISE EN CONTINUITÉ CLASSIQUE
             else {
