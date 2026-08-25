@@ -309,8 +309,11 @@
             
             etatCourant = "STOPPED";
             
+            // Sécurité : Récupération du vrai dernier index basé sur les points capturés
+            const indexFinal = (indexPoint > 1) ? (indexPoint - 1) : 0;
+            
             const metaObj = {
-                dernier_index: indexPoint - 1,
+                dernier_index: indexFinal,
                 date_fin: new Date().toISOString(),
                 session_id: currentSessionId
             };
@@ -324,7 +327,7 @@
             iconPause.style.display = "none";
             btnRec.style.background = "#ff0000";
 
-            statusText.innerText = "Status : Parcours archivé sous " + currentSessionId + " ✓";
+            statusText.innerText = "Status : Parcours archivé (" + indexFinal + " pts) ✓";
             rafraichirVisuel();
         }
     });
@@ -351,19 +354,28 @@
         }
     });
 
-    // ARCHIVAGE NOMMÉ ASYNCHRONE DÉBLOQUÉ TOUS ÉTATS
+    // ARCHIVAGE NOMMÉ ASYNCHRONE (Inclus la mise à jour de dernier_index)
     btnArchive.addEventListener('click', async () => {
         const nomPerso = prompt("Nommer cette archive de parcours :", "Parcours_Escalier_01");
         if (!nomPerso) return;
 
         statusText.innerText = "Status : Sauvegarde réseau en cours...";
-        bloquerInterface(true); // Verrouillage d'interface pour éviter toute frappe prématurée
+        bloquerInterface(true); 
 
         try {
+            // 1. Mise à jour préalable de meta avant la copie
+            const indexFinal = (indexPoint > 1) ? (indexPoint - 1) : 0;
+            await sessionRef.child("meta").update({
+                dernier_index: indexFinal,
+                date_sauvegarde: new Date().toISOString(),
+                session_id: currentSessionId || "session_directe"
+            });
+
+            // 2. Copie complète de la session vers l'archive
             const snapshot = await sessionRef.once('value');
             const data = snapshot.val();
             
-            if (!data) {
+            if (!data || !data.points) {
                 alert("Aucune donnée dans la session courante à archiver.");
                 statusText.innerText = "Status : Session courante vide ⚠";
                 bloquerInterface(false);
@@ -373,14 +385,14 @@
             const cleanName = nomPerso.replace(/[^a-zA-Z0-9_-]/g, "_");
             await db.ref("archives/" + cleanName).set(data);
 
-            statusText.innerText = "Status : Archive '" + cleanName + "' créée ✓";
+            statusText.innerText = "Status : Archive '" + cleanName + "' (" + indexFinal + " pts) créée ✓";
             alert("Parcours sauvegardé avec succès dans /archives/" + cleanName);
         } catch (err) {
             console.error(err);
             statusText.innerText = "Status : Erreur Archivage ⚠";
             alert("Erreur lors de la sauvegarde réseau : " + err.message);
         } finally {
-            bloquerInterface(false); // Déverrouillage sécurisé après confirmation réseau
+            bloquerInterface(false);
             rafraichirVisuel();
         }
     });
