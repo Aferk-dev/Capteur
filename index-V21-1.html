@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Moniteur Virtual Cam Pro - V21.1 (Auto-Origin + Baromètre)</title>
+    <!-- SDK Firebase Web -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; background: #5b9bd5; font-family: -apple-system, sans-serif; height: 100%; min-height: -webkit-fill-available; color: white; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        
+        .main-container { display: flex; flex-direction: column; width: 100%; max-width: 450px; height: 100vh; height: -webkit-fill-available; padding: 8px; gap: 6px; justify-content: space-between; }
+        
+        .video-zone { flex: 2; background: #000; border-radius: 18px; border: 2px solid #1f4e79; overflow: hidden; display: flex; align-items: center; justify-content: center; min-height: 0; position: relative; }
+        #video-preview { width: 100%; height: 100%; object-fit: cover; }
+        
+        @keyframes blink-red {
+            0% { background-color: rgba(255, 0, 0, 0.9); color: #ffffff; }
+            50% { background-color: rgba(128, 0, 0, 0.9); color: #ffffff; }
+            100% { background-color: rgba(255, 0, 0, 0.9); color: #ffffff; }
+        }
+        @keyframes blink-green {
+            0% { background-color: rgba(0, 255, 0, 0.9); color: #000000; }
+            50% { background-color: rgba(0, 128, 0, 0.9); color: #ffffff; }
+            100% { background-color: rgba(0, 255, 0, 0.9); color: #000000; }
+        }
+        
+        #calib-overlay {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 10;
+            font-weight: bold;
+            font-size: 1.1rem;
+            text-align: center;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: inset 0 0 20px #000;
+        }
+        .mode-red { animation: blink-red 0.5s infinite; }
+        .mode-green { animation: blink-green 0.5s infinite; }
+
+        .right-panel { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+
+        .data-box { background: #000; border: 1.5px solid #888; padding: 6px 8px; border-radius: 6px; font-family: monospace; font-size: 0.72rem; line-height: 1.3; display: flex; flex-direction: column; justify-content: center; }
+        .data-box-title { border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 3px; font-weight: bold; color: #ddd; font-size: 0.75rem; }
+        
+        .buttons-zone { display: flex; justify-content: space-around; align-items: center; width: 100%; padding: 2px 0; gap: 6px; }
+        .round-btn { position: relative; width: 38px; height: 38px; border-radius: 50%; border: 2px solid white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 9px; box-shadow: 0 2px 6px rgba(0,0,0,0.4); transition: transform 0.1s, opacity 0.2s; color: white; flex-shrink: 0; }
+        .round-btn:active { transform: scale(0.92); }
+        .round-btn.disabled { opacity: 0.3 !important; pointer-events: none !important; }
+        
+        #btn-reset { background: linear-gradient(135deg, #11998e, #38ef7d); }
+        #btn-rec { background: #ff0000; }
+        .pause-icon { display: none; width: 12px; height: 14px; justify-content: space-between; }
+        .pause-bar { width: 4px; height: 100%; background: #ffa500; border-radius: 1px; }
+        #btn-stop { background: linear-gradient(135deg, #777, #333); border-color: #bbb; }
+        .stop-core { width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, #d9534f, #c9302c); display: flex; align-items: center; justify-content: center; border: 1.5px solid #fff; font-size: 7px; font-weight: bold; }
+        #btn-archive { background: linear-gradient(135deg, #8e44ad, #9b59b6); border-color: #ddd; }
+        #status-text { font-weight: bold; color: #ffca28; margin-top: 2px; font-size: 0.7rem; }
+
+        @media (orientation: landscape) {
+            .main-container { flex-direction: row; max-width: 100%; padding: 6px; gap: 8px; }
+            .video-zone { flex: 1.8; height: 100%; border-radius: 12px; }
+            .right-panel { flex: 1; display: flex; flex-direction: column; justify-content: space-between; height: 100%; min-height: 0; }
+            .data-box { flex: 1; padding: 6px; font-size: 0.68rem; min-height: 0; overflow: hidden; }
+            .buttons-zone { flex-shrink: 0; padding-bottom: 0; }
+            .round-btn { width: 34px; height: 34px; font-size: 8px; }
+            .stop-core { width: 20px; height: 20px; font-size: 6px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="video-zone">
+            <video id="video-preview" autoplay playsinline muted></video>
+            <div id="calib-overlay">
+                <span id="calib-msg">⚠️ STABILISEZ LE TÉLÉPHONE<br><small style="font-size: 0.7rem; margin-top: 5px;">CALIBRATION GRAVITÉ...</small></span>
+            </div>
+        </div>
+        <div class="right-panel">
+            <div class="data-box">
+                <div id="title-version" class="data-box-title">Données de session :</div>
+                <div id="live-data">LIGNE INTERNE : 1 <br>AC: X: +0.00 | Y: +0.00 | Z: +0.00<br>ROT A:   0° | B:   0° | G:   0°<br>PRESSION : 1013.25 hPa<br>Flux : V21.1 Auto-Origin</div>
+                <div id="status-text">Status : Prêt</div>
+            </div>
+            <div class="buttons-zone">
+                <div id="btn-reset" class="round-btn" title="Réinitialiser Session Courante">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="white"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                </div>
+                <div id="btn-rec" class="round-btn">
+                    <span id="label-rec">REC</span>
+                    <div id="icon-pause" class="pause-icon"><div class="pause-bar"></div><div class="pause-bar"></div></div>
+                </div>
+                <div id="btn-stop" class="round-btn"><div class="stop-core">STOP</div></div>
+                <div id="btn-archive" class="round-btn" title="Archiver ce parcours">SAVE</div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const VERSION_APP = "V21.1 (Auto-Origin + Baro)";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA_3N54LwJVYI4PRtR1XDvkn_v8WEH5rk0",
+      authDomain: "data-capteurs-phone.firebaseapp.com",
+      databaseURL: "https://data-capteurs-phone-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "data-capteurs-phone",
+      storageBucket: "data-capteurs-phone.firebasestorage.app",
+      messagingSenderId: "878248473706",
+      appId: "1:878248473706:web:48d1c717bfba6b77020613",
+      measurementId: "G-CBGZ3433JC"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    
+    const sessionRef = db.ref("session_courante");
+    let sessionHistoriqueRef = null;
+    let currentSessionId = "";
+
+    let curX = 0, curY = 0, curZ = 0;
+    let curA = 0, curB = 0, curG = 0;
+    let curPressure = 1013.25;
+    let orient = "PORTRAIT";
+
+    let indexPoint = 1;
+    let etatCourant = "STOPPED"; // STOPPED, CALIBRATING, ORIGIN_ACQUISITION, RECORDING, PAUSED
+    let hardwareDemarre = false;
+
+    // Tableaux pour moyenner l'origine
+    let pointsOrigineBuffer = [];
+
+    const liveDataDisplay = document.getElementById("live-data");
+    const statusText = document.getElementById("status-text");
+    const calibOverlay = document.getElementById("calib-overlay");
+    const calibMsg = document.getElementById("calib-msg");
+    const btnRec = document.getElementById("btn-rec");
+    const btnStop = document.getElementById("btn-stop");
+    const btnReset = document.getElementById("btn-reset");
+    const btnArchive = document.getElementById("btn-archive");
+    const labelRec = document.getElementById("label-rec");
+    const iconPause = document.getElementById("icon-pause");
+
+    window.onload = async () => {
+        const titleBox = document.getElementById('title-version');
+        if (titleBox) titleBox.innerText = "Données [" + VERSION_APP + "] :";
+
+        statusText.innerText = "Status : Connexion Firebase...";
+        bloquerInterface(true);
+        await demarrerHardwarePhysique();
+
+        sessionRef.child("meta/dernier_index").once('value')
+            .then(snapshot => {
+                let val = snapshot.val();
+                indexPoint = val ? parseInt(val) + 1 : 1;
+                libererBoutonRec("Firebase Connecté ✓");
+            })
+            .catch(() => {
+                indexPoint = 1;
+                libererBoutonRec("Firebase (Prêt) ✓");
+            });
+    };
+
+    function bloquerInterface(bloquer) {
+        [btnRec, btnStop, btnReset, btnArchive].forEach(b => {
+            if (bloquer) b.classList.add('disabled');
+            else b.classList.remove('disabled');
+        });
+    }
+
+    function libererBoutonRec(message) {
+        bloquerInterface(false);
+        btnRec.style.background = "#ff0000";
+        statusText.innerText = "Status : " + message;
+        rafraichirVisuel();
+    }
+
+    function genererIDSession() {
+        const d = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        return `session_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}h${pad(d.getMinutes())}m${pad(d.getSeconds())}s`;
+    }
+
+    function enregistrerPointCourant() {
+        let timestamp = new Date().toISOString();
+        const dataPoint = {
+            index: indexPoint,
+            timestamp: timestamp,
+            acc_x: curX, acc_y: curY, acc_z: curZ,
+            alpha: curA, beta: curB, gamma: curG,
+            pressure: curPressure,
+            mode: orient
+        };
+
+        if (etatCourant === "ORIGIN_ACQUISITION") {
+            // Stocke temporairement pour faire la moyenne de l'origine
+            pointsOrigineBuffer.push(dataPoint);
+            return;
+        }
+
+        if (etatCourant === "RECORDING") {
+            sessionRef.child("points/" + indexPoint).set(dataPoint);
+            if (sessionHistoriqueRef) {
+                sessionHistoriqueRef.child("points/" + indexPoint).set(dataPoint);
+            }
+            indexPoint++;
+            rafraichirVisuel();
+        }
+    }
+
+    async function demarrerHardwarePhysique() {
+        if (hardwareDemarre) return;
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+            const videoElement = document.getElementById('video-preview');
+            if (videoElement) {
+                videoElement.srcObject = stream;
+                await videoElement.play().catch(e => console.log("Play bloqué:", e));
+            }
+        } catch (err) { console.warn("Alerte Caméra : " + err.message); }
+
+        window.addEventListener('devicemotion', (e) => {
+            const acc = e.accelerationIncludingGravity;
+            if (acc) {
+                curX = acc.x || 0; curY = acc.y || 0; curZ = acc.z || 0;
+                enregistrerPointCourant();
+            }
+        }, true);
+
+        window.addEventListener('deviceorientation', (e) => {
+            curA = e.alpha || 0; curB = e.beta || 0; curG = e.gamma || 0;
+            rafraichirVisuel();
+        }, true);
+
+        hardwareDemarre = true;
+    }
+
+    btnRec.addEventListener('click', async () => {
+        if (!hardwareDemarre) await demarrerHardwarePhysique();
+
+        if (etatCourant === "STOPPED") {
+            currentSessionId = genererIDSession();
+            sessionHistoriqueRef = db.ref("sessions/" + currentSessionId);
+
+            // ÉTAPE 1 : Stabilisation Gravité (1.5s - Rouge Clignotant)
+            etatCourant = "CALIBRATING";
+            calibOverlay.className = "mode-red";
+            calibOverlay.style.display = "flex";
+            calibMsg.innerHTML = "⚠️ STABILISEZ LE TÉLÉPHONE<br><small style='font-size: 0.7rem; margin-top: 5px;'>CALIBRATION GRAVITÉ (1.5s)...</small>";
+            statusText.innerText = "Status : STABILISATION...";
+            bloquerInterface(true);
+
+            setTimeout(() => {
+                // ÉTAPE 2 : Saisie de l'Origine Moyennée (1.5s - Vert Clignotant)
+                etatCourant = "ORIGIN_ACQUISITION";
+                pointsOrigineBuffer = [];
+                calibOverlay.className = "mode-green";
+                calibMsg.innerHTML = "🟢 SAISIE ORIGINE EN COURS<br><small style='font-size: 0.7rem; margin-top: 5px;'>MOYENNAGE DU REPOS (1.5s)...</small>";
+                statusText.innerText = "Status : SAISIE ORIGINE...";
+
+                setTimeout(() => {
+                    // Calcul de la moyenne de l'origine si des points ont été capturés
+                    let origineMoyenne = { acc_x: 0, acc_y: 0, acc_z: 9.81, alpha: curA, beta: curB, gamma: curG, pressure: curPressure };
+                    if (pointsOrigineBuffer.length > 0) {
+                        let sumX = 0, sumY = 0, sumZ = 0, sumA = 0, sumB = 0, sumG = 0, sumP = 0;
+                        pointsOrigineBuffer.forEach(p => {
+                            sumX += p.acc_x; sumY += p.acc_y; sumZ += p.acc_z;
+                            sumA += p.alpha; sumB += p.beta; sumG += p.gamma; sumP += p.pressure;
+                        });
+                        let count = pointsOrigineBuffer.length;
+                        origineMoyenne = {
+                            acc_x: sumX/count, acc_y: sumY/count, acc_z: sumZ/count,
+                            alpha: sumA/count, beta: sumB/count, gamma: sumG/count,
+                            pressure: sumP/count, mode: orient
+                        };
+                    }
+
+                    // On enregistre le point d'origine officiel (balise de début) dans la BDD
+                    origineMoyenne.index = indexPoint;
+                    origineMoyenne.timestamp = new Date().toISOString();
+                    origineMoyenne.tag = "ORIGINE_DEBUT";
+
+                    sessionRef.child("points/" + indexPoint).set(origineMoyenne);
+                    if (sessionHistoriqueRef) sessionHistoriqueRef.child("points/" + indexPoint).set(origineMoyenne);
+                    indexPoint++;
+
+                    // ÉTAPE 3 : Démarrage du Rec effectif
+                    calibOverlay.style.display = "none";
+                    bloquerInterface(false);
+                    etatCourant = "RECORDING";
+                    labelRec.style.display = "none";
+                    iconPause.style.display = "none";
+                    btnRec.style.background = "#222222"; 
+                    statusText.innerText = "Status : Rec Actif [" + currentSessionId + "]";
+                }, 1500);
+
+            }, 1500);
+        } 
+        else if (etatCourant === "PAUSED") {
+            etatCourant = "RECORDING";
+            labelRec.style.display = "none";
+            iconPause.style.display = "none";
+            btnRec.style.background = "#222222"; 
+            statusText.innerText = "Status : Reprise Rec";
+        }
+        else if (etatCourant === "RECORDING") {
+            etatCourant = "PAUSED";
+            labelRec.style.display = "none";
+            iconPause.style.display = "flex";
+            btnRec.style.background = "#ff0000";
+            statusText.innerText = "Status : Session en pause";
+        }
+    });
+
+    btnStop.addEventListener('click', () => {
+        if (etatCourant === "RECORDING" || etatCourant === "PAUSED") {
+            calibOverlay.style.display = "none";
+            bloquerInterface(false);
+            etatCourant = "STOPPED";
+            
+            const indexFinal = (indexPoint > 1) ? (indexPoint - 1) : 0;
+            const metaObj = { dernier_index: indexFinal, date_fin: new Date().toISOString(), session_id: currentSessionId };
+
+            sessionRef.child("meta").update(metaObj);
+            if (sessionHistoriqueRef) sessionHistoriqueRef.child("meta").update(metaObj);
+
+            labelRec.style.display = "block";
+            iconPause.style.display = "none";
+            btnRec.style.background = "#ff0000";
+            statusText.innerText = "Status : Parcours archivé (" + indexFinal + " pts) ✓";
+            rafraichirVisuel();
+        }
+    });
+
+    btnReset.addEventListener('click', () => {
+        if (etatCourant === "PAUSED" || etatCourant === "STOPPED") {
+            statusText.innerText = "Status : Purge...";
+            bloquerInterface(true);
+            indexPoint = 1;
+            sessionRef.remove().then(() => {
+                statusText.innerText = "Status : Purge OK ✓";
+                bloquerInterface(false);
+                rafraichirVisuel();
+            });
+        }
+    });
+
+    btnArchive.addEventListener('click', async () => {
+        const nomPerso = prompt("Nommer cette archive :", "Parcours_Cadre_V21");
+        if (!nomPerso) return;
+        statusText.innerText = "Status : Sauvegarde...";
+        bloquerInterface(true); 
+        try {
+            const indexFinal = (indexPoint > 1) ? (indexPoint - 1) : 0;
+            await sessionRef.child("meta").update({ dernier_index: indexFinal, date_sauvegarde: new Date().toISOString() });
+            const snapshot = await sessionRef.once('value');
+            const cleanName = nomPerso.replace(/[^a-zA-Z0-9_-]/g, "_");
+            await db.ref("archives/" + cleanName).set(snapshot.val());
+            statusText.innerText = "Status : Archivé '" + cleanName + "' ✓";
+            alert("Sauvegardé sous /archives/" + cleanName);
+        } catch (err) {
+            statusText.innerText = "Status : Erreur ⚠";
+        } finally {
+            bloquerInterface(false);
+            rafraichirVisuel();
+        }
+    });
+
+    function formatNum(val, dec, width) {
+        let n = Number(val) || 0;
+        return (n >= 0 ? "+" : "") + n.toFixed(dec).padStart(width, ' ');
+    }
+
+    function rafraichirVisuel() {
+        if (liveDataDisplay) {
+            liveDataDisplay.innerHTML = 
+                "Index Global : <b>" + indexPoint + "</b><br>" +
+                "AC: X:" + formatNum(curX, 2, 5) + " | Y:" + formatNum(curY, 2, 5) + " | Z:" + formatNum(curZ, 2, 5) + "<br>" +
+                "ROT A:" + formatNum(curA, 0, 3) + "° | B:" + formatNum(curB, 0, 3) + "° | G:" + formatNum(curG, 0, 3) + "°<br>" +
+                "PRESSION : <b>" + curPressure.toFixed(2) + " hPa</b><br>" +
+                "Flux : <b>V21.1 Auto-Origin 🚀</b>";
+        }
+    }
+</script>
+</body>
+</html>
